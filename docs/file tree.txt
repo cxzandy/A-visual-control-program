@@ -1,0 +1,32 @@
+Projact For Tiaozhanbei2.0/
+├── README.md
+├── requirements.txt
+├── data/                # 数据集、标定图片、测试视频等 
+├── docs/                # 文档、设计说明、流程图等
+├── src/                 # 源代码
+│   ├── __init__.py
+│   ├── main.py          # 主程序入口
+│   ├── config.py        # 配置文件
+│   ├── camera/          # 相机相关代码
+│   │   ├── __init__.py
+│   │   ├── stereo_capture.py   # 双目采集
+│   │   ├── calibration.py      # 相机标定
+│   │   └── depth_estimation.py # 深度计算
+│   ├── robot/           # 机器人控制相关
+│   │   ├── __init__.py
+│   │   ├── motion_control.py   # 运动控制
+│   │   └── communication.py    # 通信协议
+│   ├── perception/      # 感知与识别
+│   │   ├── __init__.py
+│   │   ├── obstacle_detection.py # 障碍物检测
+│   │   └── pipe_tracking.py     # 管道跟踪
+│   └── utils/           # 工具函数
+│       ├── __init__.py
+│       └── logger.py
+├── tests/               # 单元测试
+│   ├── test_camera.py
+│   ├── test_robot.py
+│   └── test_perception.py
+├── scripts/             # 各类运行脚本
+│   └── run_demo.sh
+└── output/              # 输出结果、日志、模型等
