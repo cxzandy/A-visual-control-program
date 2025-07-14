@@ -222,9 +222,10 @@ class PlatformConfig:
             return 'linux'
         else:
             return 'unknown'
-    
-    # 当前平台
-    CURRENT_PLATFORM = detect_platform()
+
+# 实例化平台配置
+platform_detector = PlatformConfig()
+CURRENT_PLATFORM = platform_detector.detect_platform()
 
 # ========================= Jetson AGX Xavier 优化配置 =========================
 class JetsonConfig:
@@ -328,7 +329,7 @@ def print_config_summary():
 # ========================= 配置初始化和平台适配 =========================
 def initialize_platform_config():
     """根据检测到的平台初始化配置"""
-    platform = PlatformConfig.CURRENT_PLATFORM
+    platform = CURRENT_PLATFORM
     
     if platform == 'jetson_agx_xavier':
         # Jetson AGX Xavier 配置

@@ -1,17 +1,56 @@
 import os
 import numpy as np
-import open3d as o3d
 from camera.stereo_capture import StereoCamera
+
+# Try to import Open3D, fallback if not available
+try:
+    import open3d as o3d
+    OPEN3D_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Open3D not available ({e}). Using fallback implementation.")
+    OPEN3D_AVAILABLE = False
 
 def save_point_cloud(points, colors, filename):
     """
     保存点云为PLY文件
     """
-    pc = o3d.geometry.PointCloud()
-    pc.points = o3d.utility.Vector3dVector(points)
-    pc.colors = o3d.utility.Vector3dVector(colors)
-    o3d.io.write_point_cloud(filename, pc)
-    print(f"点云已保存到: {filename}")
+    if OPEN3D_AVAILABLE:
+        # Use Open3D if available
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(points)
+        pc.colors = o3d.utility.Vector3dVector(colors)
+        o3d.io.write_point_cloud(filename, pc)
+        print(f"点云已保存到: {filename}")
+    else:
+        # Fallback: save as simple PLY format
+        save_point_cloud_fallback(points, colors, filename)
+
+def save_point_cloud_fallback(points, colors, filename):
+    """
+    Fallback implementation to save point cloud without Open3D
+    """
+    try:
+        with open(filename, 'w') as f:
+            # PLY header
+            f.write("ply\n")
+            f.write("format ascii 1.0\n")
+            f.write(f"element vertex {len(points)}\n")
+            f.write("property float x\n")
+            f.write("property float y\n")
+            f.write("property float z\n")
+            f.write("property uchar red\n")
+            f.write("property uchar green\n")
+            f.write("property uchar blue\n")
+            f.write("end_header\n")
+            
+            # Write point data
+            for point, color in zip(points, colors):
+                r, g, b = (color * 255).astype(int)
+                f.write(f"{point[0]:.6f} {point[1]:.6f} {point[2]:.6f} {r} {g} {b}\n")
+        
+        print(f"点云已保存到: {filename} (使用fallback实现)")
+    except Exception as e:
+        print(f"保存点云失败: {e}")
 
 def generate_point_cloud(save_path="data/point_cloud.ply", intrinsics_path="data/camera_intrinsics.npz"):
     cam = StereoCamera()
