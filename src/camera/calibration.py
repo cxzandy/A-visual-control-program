@@ -42,7 +42,3 @@ def calibrate_camera(images_dir, chessboard_size=(9,6), square_size=1.0, save_pa
 
     np.savez(save_path, mtx=mtx, dist=dist, rvecs=rvecs, tvecs=tvecs)
     print(f"标定参数已保存到 {save_path}")
-
-if __name__ == "__main__":
-    # 示例：images_dir为标定图片文件夹路径
-    calibrate_camera(images_dir="../data/calib", chessboard_size=(9,6), square_size=1.0)

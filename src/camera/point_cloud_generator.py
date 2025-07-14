@@ -51,7 +51,3 @@ def generate_point_cloud(save_path="data/point_cloud.ply", intrinsics_path="data
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     save_point_cloud(points, colors, save_path)
 
-if __name__ == "__main__":
-    generate_point_cloud()
-    # 或自定义保存路径
-    # generate_point_cloud("data/my_cloud.ply")

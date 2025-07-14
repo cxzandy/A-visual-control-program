@@ -22,21 +22,3 @@ class StereoCamera:
 
     def release(self):
         self.pipeline.stop()
-
-if __name__ == "__main__":
-    cam = StereoCamera()
-    try:
-        while True:
-            color_img, depth_img = cam.get_frames()
-            if color_img is None or depth_img is None:
-                continue
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(depth_img, alpha=0.03), cv2.COLORMAP_JET
-            )
-            images = np.hstack((color_img, depth_colormap))
-            cv2.imshow('RealSense Stereo Capture', images)
-            if cv2.waitKey(1) & 0xFF == 24:
-                break
-    finally:
-        cam.release()
-        cv2.destroyAllWindows()

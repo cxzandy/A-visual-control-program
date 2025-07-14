@@ -28,29 +28,3 @@ class DepthEstimator:
 
     def release(self):
         self.pipeline.stop()
-
-if __name__ == "__main__":
-    estimator = DepthEstimator()
-    try:
-        while True:
-            color_img, depth_img, depth_frame = estimator.get_aligned_frames()
-            if color_img is None or depth_img is None:
-                continue
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(depth_img, alpha=0.03), cv2.COLORMAP_JET
-            )
-            images = np.hstack((color_img, depth_colormap))
-            cv2.imshow('Depth Estimation', images)
-
-            # 鼠标点击获取深度
-            def mouse_callback(event, x, y, flags, param):
-                if event == cv2.EVENT_LBUTTONDOWN:
-                    distance = estimator.get_distance(depth_frame, x, y)
-                    print(f"({x}, {y}) 深度: {distance:.3f} 米")
-            cv2.setMouseCallback('Depth Estimation', mouse_callback)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-    finally:
-        estimator.release()
-        cv2.destroyAllWindows()
