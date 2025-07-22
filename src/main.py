@@ -41,6 +41,7 @@ from robot.communication import RoboMasterCSerial
 from perception.obstacle_detection import ObstacleDetector
 from perception.pipe_tracking import PipeTracker
 from utils.logger import setup_logger
+from utils.display import DisplayManager
 
 class Tiaozhanbei2System:
     """挑战杯2.0 系统主类"""
@@ -50,6 +51,9 @@ class Tiaozhanbei2System:
         self.logger = setup_logger(__name__)
         self.running = False
         self.emergency_stop = False
+        
+        # 显示管理器
+        self.display = DisplayManager()
         
         # 硬件组件
         self.camera = None
@@ -113,7 +117,7 @@ class Tiaozhanbei2System:
             
         # 3. 初始化深度估计器
         try:
-            self.depth_estimator = DepthEstimator()
+            self.depth_estimator = DepthEstimator(camera_instance=self.camera)
             self.logger.info("深度估计器初始化成功")
         except Exception as e:
             self.logger.error(f"深度估计器初始化失败: {e}")
@@ -265,9 +269,23 @@ class Tiaozhanbei2System:
                 
             # 显示结果
             if RunModeConfig.DISPLAY_ENABLED and vis_image is not None:
-                import cv2
-                cv2.imshow("管道追踪结果", vis_image)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                # 添加状态信息到图像
+                from utils.display import add_fps_overlay, add_status_overlay
+                
+                # 添加FPS显示
+                display_image = add_fps_overlay(vis_image, self.system_status["processing_fps"])
+                
+                # 添加系统状态
+                status_info = {
+                    "Camera": "OK" if self.system_status["camera_connected"] else "ERROR",
+                    "Robot": "OK" if self.system_status["robot_connected"] else "DISCONNECTED",
+                    "Frames": self.system_status["total_frames"]
+                }
+                display_image = add_status_overlay(display_image, status_info, start_y=60)
+                
+                # 显示图像
+                key = self.display.show_image("Pipe Tracking", display_image)
+                if key == ord('q'):
                     self.running = False
                     
             # 保存结果
@@ -364,17 +382,40 @@ class Tiaozhanbei2System:
             demo_end_time = time.time() + 5
             self.running = True
             
+            frame_count = 0
+            demo_start_time = time.time()
+            
             while time.time() < demo_end_time and self.running:
+                frame_start_time = time.time()
+                
                 color_frame, depth_frame = self.camera.get_frames()
                 if color_frame is not None and depth_frame is not None:
                     # 简单处理
                     obstacle_mask = self.obstacle_detector.detect(depth_frame)
                     line_params, _, vis_image = self.pipe_tracker.track(color_frame, depth_frame)
                     
+                    # 计算FPS
+                    frame_count += 1
+                    elapsed_time = time.time() - demo_start_time
+                    current_fps = frame_count / elapsed_time if elapsed_time > 0 else 0.0
+                    
                     if vis_image is not None and RunModeConfig.DISPLAY_ENABLED:
-                        import cv2
-                        cv2.imshow("演示模式", vis_image)
-                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                        from utils.display import add_fps_overlay, add_status_overlay
+                        
+                        # 添加FPS显示到演示图像
+                        display_image = add_fps_overlay(vis_image, current_fps)
+                        
+                        # 添加演示状态信息
+                        demo_status = {
+                            "Mode": "DEMO",
+                            "Frame": frame_count,
+                            "Time": f"{elapsed_time:.1f}s"
+                        }
+                        display_image = add_status_overlay(display_image, demo_status, start_y=60)
+                        
+                        # 显示图像
+                        key = self.display.show_image("Demo Mode", display_image)
+                        if key == ord('q'):
                             break
                             
             self.running = False
@@ -409,8 +450,8 @@ class Tiaozhanbei2System:
             if self.robot:
                 self.robot.close()
                 
-            import cv2
-            cv2.destroyAllWindows()
+            # 关闭显示窗口
+            self.display.close_window()
             
             self.logger.info("资源清理完成")
             

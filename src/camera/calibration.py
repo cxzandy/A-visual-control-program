@@ -88,7 +88,7 @@ def calibrate_camera(images_dir, chessboard_size=(9, 6), square_size=0.025, save
 
             # 绘制并显示角点（可选）
             cv2.drawChessboardCorners(img, chessboard_size, corners2, ret)
-            cv2.imshow('发现角点', img)
+            cv2.imshow('Corners Found', img)
             cv2.waitKey(500)  # 等待0.5秒
         else:
             print(f"在图片 {os.path.basename(fname)} 中未能检测到棋盘格角点。")

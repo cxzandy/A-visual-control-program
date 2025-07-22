@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiaozhanbei2.0 - 管道追踪控制台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .control-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .mode-selector {
+            margin-bottom: 20px;
+        }
+        
+        .mode-selector label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        
+        .mode-btn {
+            padding: 12px 20px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+            text-align: center;
+        }
+        
+        .mode-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .mode-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+        
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .image-display {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        .image-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #ddd;
+        }
+        
+        .camera-image {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .no-image {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .logs {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-timestamp {
+            color: #3498db;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .control-buttons {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🤖 Tiaozhanbei2.0</h1>
+            <p>管道追踪与法兰识别系统 - Web控制台</p>
+        </div>
+        
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <!-- 状态栏 -->
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-label">系统状态</div>
+                    <div class="status-value" id="system-status">待机</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">相机状态</div>
+                    <div class="status-value" id="camera-status">未连接</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">处理FPS</div>
+                    <div class="status-value" id="processing-fps">0.0</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">检测象限</div>
+                    <div class="status-value" id="quadrants-detected">0/4</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">处理帧数</div>
+                    <div class="status-value" id="frame-count">0</div>
+                </div>
+            </div>
+            
+            <!-- 消息提示 -->
+            <div id="alert-container"></div>
+            
+            <!-- 模式选择 -->
+            <div class="mode-selector">
+                <label>选择运行模式：</label>
+                <div class="mode-buttons">
+                    <div class="mode-btn active" data-mode="demo">
+                        <strong>演示模式</strong><br>
+                        <small>快速功能展示</small>
+                    </div>
+                    <div class="mode-btn" data-mode="track">
+                        <strong>实时追踪</strong><br>
+                        <small>连续管道检测</small>
+                    </div>
+                    <div class="mode-btn" data-mode="calib">
+                        <strong>相机标定</strong><br>
+                        <small>校准相机参数</small>
+                    </div>
+                    <div class="mode-btn" data-mode="test">
+                        <strong>系统测试</strong><br>
+                        <small>完整功能测试</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 控制按钮 -->
+            <div class="control-buttons">
+                <button class="btn btn-primary" id="start-btn">🚀 启动系统</button>
+                <button class="btn btn-danger" id="stop-btn" disabled>⏹️ 停止系统</button>
+            </div>
+        </div>
+        
+        <!-- 图像显示 -->
+        <div class="image-display">
+            <h3>实时图像显示</h3>
+            <div class="image-container">
+                <img id="camera-image" class="camera-image hidden" alt="相机图像">
+                <div id="no-image" class="no-image">
+                    📷 等待图像数据...<br>
+                    <small>启动系统后将显示实时的四象限管道检测结果</small>
+                </div>
+            </div>
+            
+            <!-- 日志显示 -->
+            <div class="logs" id="logs">
+                <div class="log-entry">
+                    <span class="log-timestamp">[系统]</span> Web控制台已启动，等待用户操作...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentMode = 'demo';
+        let isRunning = false;
+        let updateInterval = null;
+        
+        // DOM元素
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const modeButtons = document.querySelectorAll('.mode-btn');
+        const cameraImage = document.getElementById('camera-image');
+        const noImageDiv = document.getElementById('no-image');
+        const logsDiv = document.getElementById('logs');
+        const alertContainer = document.getElementById('alert-container');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            updateStatus();
+        });
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 模式选择
+            modeButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (!isRunning) {
+                        modeButtons.forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        currentMode = this.dataset.mode;
+                        addLog(`选择模式: ${this.textContent.trim()}`);
+                    }
+                });
+            });
+            
+            // 启动按钮
+            startBtn.addEventListener('click', startSystem);
+            
+            // 停止按钮
+            stopBtn.addEventListener('click', stopSystem);
+        }
+        
+        // 启动系统
+        async function startSystem() {
+            try {
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ mode: currentMode })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    isRunning = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    modeButtons.forEach(btn => btn.style.pointerEvents = 'none');
+                    
+                    showAlert(result.message, 'success');
+                    addLog(`系统启动成功 - ${currentMode}模式`);
+                    
+                    // 开始更新状态和图像
+                    updateInterval = setInterval(updateStatus, 1000);
+                    setInterval(updateImage, 200); // 5FPS图像更新
+                } else {
+                    showAlert(result.message, 'error');
+                    addLog(`启动失败: ${result.message}`);
+                }
+            } catch (error) {
+                showAlert('连接服务器失败', 'error');
+                addLog(`连接错误: ${error.message}`);
+            }
+        }
+        
+        // 停止系统
+        async function stopSystem() {
+            try {
+                const response = await fetch('/api/stop', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    isRunning = false;
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    modeButtons.forEach(btn => btn.style.pointerEvents = 'auto');
+                    
+                    showAlert(result.message, 'success');
+                    addLog('系统已停止');
+                    
+                    // 停止更新
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                    }
+                    
+                    // 隐藏图像
+                    cameraImage.classList.add('hidden');
+                    noImageDiv.classList.remove('hidden');
+                } else {
+                    showAlert(result.message, 'error');
+                    addLog(`停止失败: ${result.message}`);
+                }
+            } catch (error) {
+                showAlert('连接服务器失败', 'error');
+                addLog(`连接错误: ${error.message}`);
+            }
+        }
+        
+        // 更新系统状态
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // 更新状态显示
+                document.getElementById('system-status').textContent = 
+                    data.is_running ? `运行中 (${data.current_mode})` : '待机';
+                document.getElementById('camera-status').textContent = data.stats.camera_status;
+                document.getElementById('processing-fps').textContent = data.stats.processing_fps;
+                document.getElementById('quadrants-detected').textContent = 
+                    `${data.stats.quadrants_detected}/4`;
+                document.getElementById('frame-count').textContent = data.stats.frame_count;
+                
+            } catch (error) {
+                console.error('更新状态失败:', error);
+            }
+        }
+        
+        // 更新图像
+        async function updateImage() {
+            if (!isRunning) return;
+            
+            try {
+                const response = await fetch('/api/image');
+                const data = await response.json();
+                
+                if (data.success) {
+                    cameraImage.src = data.image;
+                    cameraImage.classList.remove('hidden');
+                    noImageDiv.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('更新图像失败:', error);
+            }
+        }
+        
+        // 显示提示消息
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alert);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        }
+        
+        // 添加日志
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+            
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            
+            // 限制日志条数
+            const logEntries = logsDiv.querySelectorAll('.log-entry');
+            if (logEntries.length > 100) {
+                logEntries[0].remove();
+            }
+        }
+    </script>
+</body>
+</html>

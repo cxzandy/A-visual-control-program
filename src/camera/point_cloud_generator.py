@@ -52,7 +52,87 @@ def save_point_cloud_fallback(points, colors, filename):
     except Exception as e:
         print(f"保存点云失败: {e}")
 
+class PointCloudGenerator:
+    """点云生成器类"""
+    
+    def __init__(self, intrinsics_path="data/calib/config/d455_intrinsics.npz"):
+        """
+        初始化点云生成器
+        
+        Args:
+            intrinsics_path: 相机内参文件路径
+        """
+        self.intrinsics_path = intrinsics_path
+        self.camera_matrix = None
+        self.load_intrinsics()
+        
+    def load_intrinsics(self):
+        """加载相机内参"""
+        try:
+            if os.path.exists(self.intrinsics_path):
+                calib = np.load(self.intrinsics_path)
+                self.camera_matrix = calib["camera_matrix"]
+                print(f"成功加载相机内参: {self.intrinsics_path}")
+            else:
+                print(f"警告: 未找到相机内参文件: {self.intrinsics_path}")
+                # 使用默认内参
+                self.camera_matrix = np.array([[615.0, 0, 320.0],
+                                             [0, 615.0, 240.0],
+                                             [0, 0, 1.0]])
+        except Exception as e:
+            print(f"加载相机内参失败: {e}")
+            # 使用默认内参
+            self.camera_matrix = np.array([[615.0, 0, 320.0],
+                                         [0, 615.0, 240.0],
+                                         [0, 0, 1.0]])
+    
+    def generate_point_cloud(self, color_img, depth_img, save_path=None):
+        """
+        从彩色图像和深度图像生成点云
+        
+        Args:
+            color_img: 彩色图像
+            depth_img: 深度图像
+            save_path: 保存路径（可选）
+            
+        Returns:
+            points: 点云坐标
+            colors: 点云颜色
+        """
+        if self.camera_matrix is None:
+            print("相机内参未加载")
+            return None, None
+            
+        fx = self.camera_matrix[0, 0]
+        fy = self.camera_matrix[1, 1]
+        cx = self.camera_matrix[0, 2]
+        cy = self.camera_matrix[1, 2]
+        scale = 1000.0  # 深度缩放（如单位为mm则为1000）
+
+        points = []
+        colors = []
+        for v in range(depth_img.shape[0]):
+            for u in range(depth_img.shape[1]):
+                d = depth_img[v, u]
+                if d == 0:
+                    continue
+                z = d / scale
+                x = (u - cx) * z / fx
+                y = (v - cy) * z / fy
+                points.append([x, y, z])
+                colors.append(color_img[v, u] / 255.0)
+        
+        points = np.array(points)
+        colors = np.array(colors)
+        
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            save_point_cloud(points, colors, save_path)
+            
+        return points, colors
+
 def generate_point_cloud(save_path="data/point_cloud.ply", intrinsics_path="data/camera_intrinsics.npz"):
+    """向后兼容的函数版本"""
     cam = StereoCamera()
     color_img, depth_img = cam.get_frames()
     cam.release()

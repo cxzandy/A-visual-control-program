@@ -309,7 +309,7 @@ def validate_config():
     if not (1200 <= RobotConfig.BAUD_RATE <= 921600):
         errors.append("串口波特率超出合理范围")
     
-    if not (0.1 <= CameraConfig.DEPTH_SCALE <= 1.0):
+    if not (0.0001 <= CameraConfig.DEPTH_SCALE <= 1.0):
         errors.append("深度比例超出合理范围")
     
     return errors
