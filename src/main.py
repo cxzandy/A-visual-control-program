@@ -221,14 +221,14 @@ class Tiaozhanbei2System:
                 # 障碍物检测
                 obstacle_mask = self.obstacle_detector.detect(depth_frame)
                 
-                # 管道追踪
-                line_params, global_axis, vis_image = self.pipe_tracker.track(
+                # 管道追踪（包含方向预测）
+                line_params, global_axis, vis_image, prediction_info = self.pipe_tracker.track(
                     color_frame, depth_frame
                 )
                 
                 # 处理结果
                 self._process_tracking_results(
-                    obstacle_mask, line_params, global_axis, vis_image
+                    obstacle_mask, line_params, global_axis, vis_image, prediction_info
                 )
                 
                 # 更新统计信息
@@ -260,12 +260,12 @@ class Tiaozhanbei2System:
         self.logger.info(f"追踪模式结束，共处理 {frame_count} 帧")
         return True
         
-    def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image):
-        """处理追踪结果"""
+    def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image, prediction_info=None):
+        """处理追踪结果（包含方向预测）"""
         try:
             # 发送控制命令到机器人
             if self.robot and self.system_status["robot_connected"]:
-                self._send_robot_commands(obstacle_mask, line_params, global_axis)
+                self._send_robot_commands(obstacle_mask, line_params, global_axis, prediction_info)
                 
             # 显示结果
             if RunModeConfig.DISPLAY_ENABLED and vis_image is not None:
@@ -281,6 +281,15 @@ class Tiaozhanbei2System:
                     "Robot": "OK" if self.system_status["robot_connected"] else "DISCONNECTED",
                     "Frames": self.system_status["total_frames"]
                 }
+                
+                # 添加方向预测信息
+                if prediction_info:
+                    prediction_stats = self.pipe_tracker.get_prediction_stats()
+                    status_info.update({
+                        "Prediction": f"{prediction_info['direction']} ({prediction_info['confidence']:.2f})",
+                        "Pred.Acc": f"{prediction_stats['prediction_accuracy']:.2f}"
+                    })
+                
                 display_image = add_status_overlay(display_image, status_info, start_y=60)
                 
                 # 显示图像
@@ -290,13 +299,13 @@ class Tiaozhanbei2System:
                     
             # 保存结果
             if RunModeConfig.SAVE_RESULTS:
-                self._save_results(vis_image, obstacle_mask, line_params)
+                self._save_results(vis_image, obstacle_mask, line_params, prediction_info)
                 
         except Exception as e:
             self.logger.error(f"处理追踪结果失败: {e}")
             
-    def _send_robot_commands(self, obstacle_mask, line_params, global_axis):
-        """向机器人发送控制命令"""
+    def _send_robot_commands(self, obstacle_mask, line_params, global_axis, prediction_info=None):
+        """向机器人发送控制命令（包含方向预测）"""
         try:
             import numpy as np
             
@@ -306,9 +315,31 @@ class Tiaozhanbei2System:
                 self.robot.send(RobotConfig.COMMANDS["STOP"])
                 self.logger.warning("检测到障碍物，发送停止命令")
             elif line_params and any(p is not None for p in line_params):
-                # 检测到管道，发送跟踪命令
-                self.robot.send("track_pipe")
-                self.logger.debug("发送管道跟踪命令")
+                # 检测到管道，根据预测方向发送相应命令
+                if prediction_info and prediction_info.get('confidence', 0) > 0.6:
+                    direction = prediction_info['direction']
+                    confidence = prediction_info['confidence']
+                    
+                    # 根据预测方向发送对应命令
+                    if direction == 'left':
+                        self.robot.send("turn_left")
+                        self.logger.info(f"预测左转，置信度: {confidence:.2f}")
+                    elif direction == 'right':
+                        self.robot.send("turn_right")
+                        self.logger.info(f"预测右转，置信度: {confidence:.2f}")
+                    elif direction == 'up':
+                        self.robot.send("move_up")
+                        self.logger.info(f"预测上升，置信度: {confidence:.2f}")
+                    elif direction == 'down':
+                        self.robot.send("move_down")
+                        self.logger.info(f"预测下降，置信度: {confidence:.2f}")
+                    else:
+                        self.robot.send("track_pipe")
+                        self.logger.debug("直线跟踪")
+                else:
+                    # 置信度不足，使用基本跟踪
+                    self.robot.send("track_pipe")
+                    self.logger.debug("发送管道跟踪命令")
             else:
                 # 无目标，发送搜索命令
                 self.robot.send("search")
@@ -317,10 +348,11 @@ class Tiaozhanbei2System:
         except Exception as e:
             self.logger.error(f"发送机器人命令失败: {e}")
             
-    def _save_results(self, vis_image, obstacle_mask, line_params):
-        """保存处理结果"""
+    def _save_results(self, vis_image, obstacle_mask, line_params, prediction_info=None):
+        """保存处理结果（包含预测信息）"""
         try:
             import cv2
+            import json
             from datetime import datetime
             
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -331,6 +363,19 @@ class Tiaozhanbei2System:
                     f"tracking_{timestamp}.jpg"
                 )
                 cv2.imwrite(image_path, vis_image)
+                
+            # 保存预测信息
+            if prediction_info:
+                json_path = os.path.join(
+                    OutputConfig.LOGS_DIR,
+                    f"prediction_{timestamp}.json"
+                )
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        'timestamp': timestamp,
+                        'prediction': prediction_info,
+                        'tracking_stats': self.pipe_tracker.get_prediction_stats()
+                    }, f, ensure_ascii=False, indent=2)
                 
         except Exception as e:
             self.logger.error(f"保存结果失败: {e}")

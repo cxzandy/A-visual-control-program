@@ -282,8 +282,12 @@
                     <div class="status-value" id="quadrants-detected">0/4</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">处理帧数</div>
-                    <div class="status-value" id="frame-count">0</div>
+                    <div class="status-label">预测方向</div>
+                    <div class="status-value" id="prediction-direction">未知</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">预测准确率</div>
+                    <div class="status-value" id="prediction-accuracy">0%</div>
                 </div>
             </div>
             
@@ -467,7 +471,26 @@
                 document.getElementById('processing-fps').textContent = data.stats.processing_fps;
                 document.getElementById('quadrants-detected').textContent = 
                     `${data.stats.quadrants_detected}/4`;
-                document.getElementById('frame-count').textContent = data.stats.frame_count;
+                
+                // 更新方向预测信息
+                const predictionDir = data.stats.prediction_direction || '未知';
+                const predictionConf = data.stats.prediction_confidence || 0;
+                const predictionAcc = data.stats.prediction_accuracy || 0;
+                
+                document.getElementById('prediction-direction').textContent = 
+                    `${predictionDir} (${(predictionConf * 100).toFixed(0)}%)`;
+                document.getElementById('prediction-accuracy').textContent = 
+                    `${(predictionAcc * 100).toFixed(1)}%`;
+                
+                // 根据方向设置颜色
+                const directionElement = document.getElementById('prediction-direction');
+                if (predictionConf > 0.7) {
+                    directionElement.style.color = '#28a745'; // 高置信度绿色
+                } else if (predictionConf > 0.4) {
+                    directionElement.style.color = '#ffc107'; // 中等置信度黄色
+                } else {
+                    directionElement.style.color = '#6c757d'; // 低置信度灰色
+                }
                 
             } catch (error) {
                 console.error('更新状态失败:', error);

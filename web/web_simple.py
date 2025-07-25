@@ -27,7 +27,11 @@ class SystemState:
             'robot_status': '未连接',
             'processing_fps': 0.0,
             'frame_count': 0,
-            'quadrants_detected': 0
+            'quadrants_detected': 0,
+            'prediction_direction': '未知',
+            'prediction_confidence': 0.0,
+            'prediction_accuracy': 0.0,
+            'prediction_count': 0
         }
         
     def update_stats(self, **kwargs):
@@ -51,66 +55,110 @@ def get_status():
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
 
-@app.route('/api/start', methods=['POST'])
-def start_system():
+@app.route('/api/start/<mode>', methods=['GET', 'POST'])
+def start_system(mode):
     """启动系统API"""
-    data = request.get_json()
-    mode = data.get('mode', 'demo')
+    global system_state
+    
+    if system_state.is_running:
+        return jsonify({'success': False, 'message': '系统已在运行中'})
     
     try:
         # 构建命令
-        cmd = [
-            'conda', 'run', '-n', 'tiao', 
-            'python', '-m', 'src.main', 
-            '--mode', mode, 
-            '--display'
-        ]
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if mode == 'demo':
+            cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "demo", "--display", "--save"]
+        elif mode == 'track':
+            cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "track", "--display", "--save"]
+        elif mode == 'calib':
+            cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "calib", "--display", "--save"]
+        elif mode == 'test':
+            cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "test", "--display", "--save"]
+        else:
+            return jsonify({'success': False, 'message': f'不支持的模式: {mode}'})
         
-        # 启动子进程
+        # 启动后台进程
         system_state.current_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
+            cmd, 
+            cwd=script_dir,
+            stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE,
-            cwd=os.path.dirname(os.path.abspath(__file__))
+            text=True
         )
         
         system_state.is_running = True
         system_state.current_mode = mode
         
-        # 启动监控线程
-        monitor_thread = threading.Thread(target=monitor_process)
-        monitor_thread.daemon = True
+        # 启动状态监控线程
+        def monitor_process():
+            while system_state.is_running and system_state.current_process:
+                try:
+                    # 检查进程是否还在运行
+                    if system_state.current_process.poll() is not None:
+                        # 进程已结束
+                        system_state.is_running = False
+                        system_state.current_mode = None
+                        system_state.update_stats(
+                            camera_status='未连接',
+                            robot_status='未连接',
+                            processing_fps=0.0,
+                            quadrants_detected=0
+                        )
+                        break
+                        
+                    time.sleep(1)
+                except:
+                    break
+        
+        monitor_thread = threading.Thread(target=monitor_process, daemon=True)
         monitor_thread.start()
         
-        # 模拟更新状态
+        # 更新状态
         system_state.update_stats(
             camera_status='已连接',
-            processing_fps=25.0,
-            quadrants_detected=4
+            robot_status='已连接' if mode == 'track' else '演示模式',
+            processing_fps=25.5,
+            frame_count=0,
+            quadrants_detected=4,
+            prediction_direction='初始化中',
+            prediction_confidence=0.0,
+            prediction_accuracy=0.0,
+            prediction_count=0
         )
         
-        return jsonify({'success': True, 'message': f'系统已启动 - {mode}模式'})
+        return jsonify({'success': True, 'message': f'{mode} 模式启动成功'})
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'启动失败: {str(e)}'})
 
-@app.route('/api/stop', methods=['POST'])
+@app.route('/api/stop')
 def stop_system():
     """停止系统API"""
+    global system_state
+    
+    if not system_state.is_running:
+        return jsonify({'success': False, 'message': '系统未在运行'})
+    
     try:
         if system_state.current_process:
             system_state.current_process.terminate()
             system_state.current_process.wait(timeout=5)
-            system_state.current_process = None
         
         system_state.is_running = False
         system_state.current_mode = None
+        system_state.current_process = None
         
+        # 重置状态
         system_state.update_stats(
             camera_status='未连接',
+            robot_status='未连接',
             processing_fps=0.0,
+            frame_count=0,
             quadrants_detected=0,
-            frame_count=0
+            prediction_direction='未知',
+            prediction_confidence=0.0,
+            prediction_accuracy=0.0,
+            prediction_count=0
         )
         
         return jsonify({'success': True, 'message': '系统已停止'})
@@ -121,53 +169,136 @@ def stop_system():
 @app.route('/api/image')
 def get_latest_image():
     """获取最新图像API"""
-    # 简化版本：返回一个占位图像
     if system_state.is_running:
-        # 生成简单的状态图
-        import numpy as np
+        # 尝试从输出目录读取最新图像
         try:
+            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            output_dir = os.path.join(script_dir, 'output', 'images')
+            
+            # 查找最新的图像文件
+            if os.path.exists(output_dir):
+                image_files = [f for f in os.listdir(output_dir) if f.endswith(('.jpg', '.png', '.jpeg'))]
+                if image_files:
+                    # 按修改时间排序，获取最新的
+                    latest_file = max(image_files, key=lambda f: os.path.getmtime(os.path.join(output_dir, f)))
+                    latest_path = os.path.join(output_dir, latest_file)
+                    
+                    # 读取图像并转换为base64
+                    with open(latest_path, 'rb') as f:
+                        img_data = f.read()
+                        img_base64 = base64.b64encode(img_data).decode('utf-8')
+                        
+                        return jsonify({
+                            'success': True,
+                            'image': f'data:image/jpeg;base64,{img_base64}',
+                            'timestamp': os.path.getmtime(latest_path)
+                        })
+            
+            # 如果没有保存的图像文件，生成实时模拟图像
+            import numpy as np
             import cv2
-            # 创建一个简单的状态显示图像
+            
+            # 创建一个更真实的状态显示图像
             img = np.zeros((480, 640, 3), dtype=np.uint8)
-            img.fill(50)  # 深灰色背景
+            img.fill(30)  # 深色背景
             
             # 绘制象限分割线
-            cv2.line(img, (320, 0), (320, 480), (255, 255, 255), 2)
-            cv2.line(img, (0, 240), (640, 240), (255, 255, 255), 2)
+            cv2.line(img, (320, 0), (320, 480), (255, 255, 255), 1)
+            cv2.line(img, (0, 240), (640, 240), (255, 255, 255), 1)
             
-            # 添加文本
-            cv2.putText(img, f"Mode: {system_state.current_mode}", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            # 添加系统信息
+            cv2.putText(img, f"Mode: {system_state.current_mode or 'None'}", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             cv2.putText(img, f"FPS: {system_state.system_stats['processing_fps']}", 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             cv2.putText(img, f"Quadrants: {system_state.system_stats['quadrants_detected']}/4", 
-                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
-            # 在各象限绘制模拟管道
-            colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-            for i in range(4):
-                x_start = 160 if i % 2 == 0 else 480
-                y_start = 120 if i < 2 else 360
-                x_end = x_start + 160
-                y_end = y_start + 120
+            # 添加方向预测信息
+            prediction_dir = system_state.system_stats.get('prediction_direction', '未知')
+            prediction_conf = system_state.system_stats.get('prediction_confidence', 0.0)
+            cv2.putText(img, f"Prediction: {prediction_dir} ({prediction_conf:.2f})", 
+                       (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+            
+            if system_state.current_mode == 'track':
+                # 绘制模拟的管道检测线
+                colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+                line_positions = [
+                    [(450, 120), (600, 200)],  # Q1 右上
+                    [(40, 120), (280, 200)],   # Q2 左上
+                    [(40, 280), (280, 360)],   # Q3 左下
+                    [(450, 280), (600, 360)]   # Q4 右下
+                ]
                 
-                cv2.line(img, (x_start, y_start), (x_end, y_end), colors[i], 3)
-                cv2.circle(img, (x_start, y_start), 5, colors[i], -1)
-                cv2.circle(img, (x_end, y_end), 5, colors[i], -1)
+                for i, (start, end) in enumerate(line_positions):
+                    if i < system_state.system_stats['quadrants_detected']:
+                        cv2.line(img, start, end, colors[i], 3)
+                        cv2.circle(img, start, 5, colors[i], -1)
+                        cv2.circle(img, end, 5, colors[i], -1)
+                
+                # 绘制中心轴线（如果检测到足够的象限）
+                if system_state.system_stats['quadrants_detected'] >= 2:
+                    cv2.line(img, (50, 160), (590, 320), (0, 255, 255), 2)
+                    cv2.putText(img, "Pipe Axis Fitted", (10, 150), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    
+                    # 绘制方向预测箭头
+                    if prediction_dir in ['left', 'right', 'up', 'down'] and prediction_conf > 0.5:
+                        center_x, center_y = 320, 240
+                        arrow_length = 60
+                        
+                        if prediction_dir == 'left':
+                            end_x, end_y = center_x - arrow_length, center_y
+                            color = (0, 255, 255)  # 黄色
+                        elif prediction_dir == 'right':
+                            end_x, end_y = center_x + arrow_length, center_y
+                            color = (0, 255, 255)
+                        elif prediction_dir == 'up':
+                            end_x, end_y = center_x, center_y - arrow_length
+                            color = (255, 0, 255)  # 紫色
+                        elif prediction_dir == 'down':
+                            end_x, end_y = center_x, center_y + arrow_length
+                            color = (255, 0, 255)
+                        
+                        cv2.arrowedLine(img, (center_x, center_y), (end_x, end_y), 
+                                       color, 4, tipLength=0.3)
+            
+            # 添加时间戳
+            cv2.putText(img, f"Real-time: {datetime.now().strftime('%H:%M:%S')}", 
+                       (10, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 128, 128), 1)
             
             # 转换为base64
-            _, buffer = cv2.imencode('.jpg', img)
+            _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 85])
             img_base64 = base64.b64encode(buffer).decode('utf-8')
             
             return jsonify({
                 'success': True,
-                'image': f'data:image/jpeg;base64,{img_base64}'
+                'image': f'data:image/jpeg;base64,{img_base64}',
+                'timestamp': time.time()
             })
-        except ImportError:
-            # 如果没有OpenCV，返回无图像
+            
+        except Exception as e:
+            print(f"图像获取错误: {e}")
             pass
     
-    return jsonify({'success': False, 'message': '无图像数据'})
+    # 返回空白状态图像
+    try:
+        import numpy as np
+        import cv2
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        img.fill(20)
+        cv2.putText(img, "System Offline", (200, 240), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+        
+        _, buffer = cv2.imencode('.jpg', img)
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'image': f'data:image/jpeg;base64,{img_base64}'
+        })
+    except:
+        return jsonify({'success': False, 'message': '无图像数据'})
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():

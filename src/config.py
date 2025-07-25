@@ -8,7 +8,7 @@ import numpy as np
 
 # ========================= 项目基础配置 =========================
 PROJECT_NAME = "Tiaozhanbei2.0"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 AUTHOR = "cxzandy"
 
 # 项目根目录
@@ -110,6 +110,38 @@ class PerceptionConfig:
     RANSAC_MAX_RADIUS = 0.5   # 最大圆柱半径 (米)
     RANSAC_SAMPLE_NUM = 3     # RANSAC采样点数
     RANSAC_ITERATIONS = 1000  # RANSAC迭代次数
+
+# ========================= 方向预测配置 =========================
+class PredictionConfig:
+    # 历史数据
+    HISTORY_SIZE = 15  # 历史轨迹点数量
+    MIN_HISTORY_FOR_PREDICTION = 5  # 进行预测所需的最小历史点数
+    
+    # 预测参数
+    PREDICTION_STEPS = 8  # 前瞻预测步数
+    CONFIDENCE_THRESHOLD = 0.5  # 置信度阈值
+    
+    # 曲率分析
+    CURVATURE_WINDOW = 3  # 曲率计算窗口大小
+    CURVE_THRESHOLD = 0.1  # 弯曲检测阈值
+    
+    # 方向判断
+    DIRECTION_ANGLE_THRESHOLD = 30  # 方向角度阈值 (度)
+    MOVEMENT_THRESHOLD = 5.0  # 最小移动距离阈值 (像素)
+    
+    # 趋势分析
+    TREND_WINDOW = 5  # 趋势分析窗口
+    TREND_THRESHOLD = 0.3  # 趋势变化阈值
+    
+    # 可视化
+    PREDICTION_ARROW_LENGTH = 50  # 预测箭头长度 (像素)
+    PREDICTION_COLORS = {
+        'left': (0, 255, 255),    # 黄色
+        'right': (0, 255, 255),   # 黄色
+        'up': (255, 0, 255),      # 紫色
+        'down': (255, 0, 255),    # 紫色
+        'unknown': (128, 128, 128) # 灰色
+    }
 
 # ========================= 运行模式配置 =========================
 class RunModeConfig:

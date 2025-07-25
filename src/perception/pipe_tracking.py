@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional, List, Dict
 import logging
+import time
 
 # 添加配置导入
 try:
@@ -11,17 +12,70 @@ except ImportError:
     class RunModeConfig:
         VERBOSE_OUTPUT = False
 
+# 导入方向预测器
+try:
+    from pipe_direction_predictor import PipeDirectionPredictor
+    from partial_pipe_tracker import PartialPipeTracker
+except ImportError:
+    try:
+        from .pipe_direction_predictor import PipeDirectionPredictor
+        from .partial_pipe_tracker import PartialPipeTracker
+    except ImportError:
+        # 如果无法导入，创建一个空的预测器类
+        class PipeDirectionPredictor:
+            def __init__(self, *args, **kwargs):
+                pass
+            def add_frame_data(self, *args, **kwargs):
+                pass
+            def predict_direction(self, *args, **kwargs):
+                return None
+        
+        class PartialPipeTracker:
+            def __init__(self, *args, **kwargs):
+                pass
+            def track_partial_pipe(self, *args, **kwargs):
+                return None
+        def predict_direction(self):
+            return {'direction': 'unknown', 'confidence': 0.0}
+        def get_direction_visualization(self, image):
+            return image
+    
+    class PartialPipeTracker:
+        def __init__(self, *args, **kwargs):
+            pass
+        def track_partial_pipe(self, *args, **kwargs):
+            return {'success': False}
+
 class PipeTracker:
-    """管道追踪器"""
+    """管道追踪器 - 增强版本支持方向预测"""
     
     def __init__(self, depth_threshold: float = 2.0, camera_intrinsics: Optional[List[float]] = None):
         self.depth_threshold = depth_threshold
         self.camera_intrinsics = camera_intrinsics
         self.logger = logging.getLogger(__name__)
         
-    def track(self, color_frame: np.ndarray, depth_frame: np.ndarray) -> Tuple[Optional[List], Optional[np.ndarray], Optional[np.ndarray]]:
+        # 添加方向预测器
+        self.direction_predictor = PipeDirectionPredictor(history_size=15, prediction_steps=8)
+        
+        # 添加部分视角追踪器
+        self.partial_tracker = PartialPipeTracker()
+        
+        # 追踪模式
+        self.tracking_mode = "auto"  # auto, full_quadrant, partial_view
+        self.quadrant_failure_count = 0
+        self.max_failures_before_switch = 3
+        
+        # 预测统计
+        self.prediction_stats = {
+            'total_predictions': 0,
+            'successful_predictions': 0,
+            'last_prediction': None,
+            'prediction_accuracy': 0.0
+        }
+        
+    def track(self, color_frame: np.ndarray, depth_frame: np.ndarray) -> Tuple[Optional[List], Optional[np.ndarray], Optional[np.ndarray], Optional[dict]]:
         """
-        追踪管道 - 四象限分析方法
+        追踪管道 - 自适应四象限分析 + 部分视角处理 + 方向预测
         
         Args:
             color_frame: 彩色图像
@@ -31,17 +85,81 @@ class PipeTracker:
             line_params_list: 四个象限的直线参数列表 [[x1,y1,x2,y2], ...] 或 None
             global_axis: 拟合的全局管道轴线3D点
             vis_image: 可视化图像
+            prediction_info: 方向预测信息
         """
         try:
             # 创建可视化图像的副本
             vis_image = color_frame.copy()
             h, w = color_frame.shape[:2]
             
-            # 1. 图像预处理
-            gray = cv2.cvtColor(color_frame, cv2.COLOR_BGR2GRAY)
+            # 1. 首先尝试四象限检测
+            if self.tracking_mode in ["auto", "full_quadrant"]:
+                line_params_list, global_axis, quadrant_success = self._try_quadrant_detection(
+                    color_frame, depth_frame, vis_image)
+                
+                if quadrant_success:
+                    # 四象限检测成功
+                    self.quadrant_failure_count = 0
+                    detected_count = len([p for p in line_params_list if p is not None])
+                    
+                    self.logger.debug(f"四象限检测成功，检测到{detected_count}个象限")
+                    
+                    # 执行方向预测
+                    prediction_info = self._perform_direction_prediction(
+                        global_axis, vis_image)
+                    
+                    return line_params_list, global_axis, vis_image, prediction_info
+                else:
+                    # 四象限检测失败
+                    self.quadrant_failure_count += 1
+                    self.logger.warning(f"四象限检测失败，失败次数: {self.quadrant_failure_count}")
             
-            # 2. 边缘检测
-            edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+            # 2. 如果四象限检测失败或模式设置为部分视角，尝试部分视角检测
+            if (self.tracking_mode in ["auto", "partial_view"] and 
+                (self.quadrant_failure_count >= self.max_failures_before_switch or 
+                 self.tracking_mode == "partial_view")):
+                
+                self.logger.info("切换到部分视角检测模式")
+                
+                partial_result = self.partial_tracker.track_partial_pipe(color_frame, depth_frame)
+                
+                if partial_result['success']:
+                    # 部分视角检测成功
+                    self.logger.info(f"部分视角检测成功，方法: {partial_result['tracking_method']}")
+                    
+                    # 转换为标准格式
+                    line_params_list = self._convert_partial_to_standard_format(partial_result)
+                    global_axis = self._estimate_axis_from_partial(partial_result)
+                    
+                    # 可视化部分视角结果
+                    vis_image = self.partial_tracker.visualize_result(vis_image, partial_result)
+                    
+                    # 执行方向预测
+                    prediction_info = self._perform_direction_prediction_from_partial(
+                        partial_result, vis_image)
+                    
+                    # 重置失败计数
+                    if self.tracking_mode == "auto":
+                        self.quadrant_failure_count = max(0, self.quadrant_failure_count - 1)
+                    
+                    return line_params_list, global_axis, vis_image, prediction_info
+            
+            # 3. 所有检测方法都失败
+            self.logger.warning("所有管道检测方法都失败")
+            
+            # 在图像上显示失败信息
+            cv2.putText(vis_image, "No pipe detected - trying multiple methods", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(vis_image, f"Quadrant failures: {self.quadrant_failure_count}", 
+                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            cv2.putText(vis_image, f"Current mode: {self.tracking_mode}", 
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
+            return None, None, vis_image, None
+            
+        except Exception as e:
+            self.logger.error(f"管道追踪失败: {e}")
+            return None, None, color_frame.copy(), None
             
             # 3. 将图像分成四个象限
             mid_x, mid_y = w // 2, h // 2
@@ -188,11 +306,391 @@ class PipeTracker:
                 edges_colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
                 vis_image = cv2.addWeighted(vis_image, 0.7, edges_colored, 0.3, 0)
             
-            return line_params_list, global_axis, vis_image
+            # 9. 方向预测处理
+            prediction_info = None
+            if detected_count >= 2 and global_axis is not None and len(global_axis) > 0:
+                try:
+                    # 计算管道中心点（轴线的中心）
+                    center_point = np.mean(global_axis, axis=0)[:2]  # 取x,y坐标
+                    
+                    # 计算管道角度（基于轴线的主方向）
+                    if len(global_axis) >= 2:
+                        axis_vector = global_axis[-1][:2] - global_axis[0][:2]
+                        angle = np.degrees(np.arctan2(axis_vector[1], axis_vector[0]))
+                    else:
+                        angle = 0.0
+                    
+                    # 更新方向预测器
+                    self.direction_predictor.add_frame_data(
+                        center_point=tuple(center_point),
+                        angle=angle,
+                        timestamp=time.time()
+                    )
+                    
+                    # 获取方向预测
+                    prediction = self.direction_predictor.predict_direction()
+                    prediction_info = prediction
+                    
+                    # 更新统计信息
+                    self._update_prediction_stats(prediction)
+                    
+                    # 在可视化图像上添加预测信息
+                    vis_image = self._add_prediction_visualization(vis_image, prediction, center_point)
+                    
+                except Exception as e:
+                    self.logger.warning(f"方向预测处理失败: {e}")
+            
+            return line_params_list, global_axis, vis_image, prediction_info
             
         except Exception as e:
             self.logger.error(f"管道追踪失败: {e}")
-            return None, None, color_frame.copy()
+            return None, None, color_frame.copy(), None
+    
+    def _update_prediction_stats(self, prediction: dict):
+        """更新预测统计信息"""
+        try:
+            self.prediction_stats['total_predictions'] += 1
+            self.prediction_stats['last_prediction'] = prediction
+            
+            # 简单的成功判断：如果置信度大于阈值就认为是成功预测
+            if prediction.get('confidence', 0) > 0.5:
+                self.prediction_stats['successful_predictions'] += 1
+            
+            # 计算准确率
+            if self.prediction_stats['total_predictions'] > 0:
+                self.prediction_stats['prediction_accuracy'] = (
+                    self.prediction_stats['successful_predictions'] / 
+                    self.prediction_stats['total_predictions']
+                )
+        except Exception as e:
+            self.logger.warning(f"更新预测统计失败: {e}")
+    
+    def _add_prediction_visualization(self, image: np.ndarray, prediction: dict, center_point: np.ndarray) -> np.ndarray:
+        """在图像上添加方向预测可视化"""
+        try:
+            direction = prediction.get('direction', 'unknown')
+            confidence = prediction.get('confidence', 0.0)
+            
+            # 方向箭头配置
+            arrow_length = 50
+            arrow_thickness = 3
+            
+            # 根据方向确定箭头终点
+            center_x, center_y = int(center_point[0]), int(center_point[1])
+            
+            if direction == 'left':
+                end_x, end_y = center_x - arrow_length, center_y
+                color = (0, 255, 255)  # 黄色
+            elif direction == 'right':
+                end_x, end_y = center_x + arrow_length, center_y
+                color = (0, 255, 255)  # 黄色
+            elif direction == 'up':
+                end_x, end_y = center_x, center_y - arrow_length
+                color = (255, 0, 255)  # 紫色
+            elif direction == 'down':
+                end_x, end_y = center_x, center_y + arrow_length
+                color = (255, 0, 255)  # 紫色
+            else:
+                end_x, end_y = center_x, center_y
+                color = (128, 128, 128)  # 灰色
+            
+            # 绘制箭头
+            if direction != 'unknown':
+                cv2.arrowedLine(image, (center_x, center_y), (end_x, end_y), 
+                               color, arrow_thickness, tipLength=0.3)
+            
+            # 添加文本信息
+            text = f"Dir: {direction.upper()} ({confidence:.2f})"
+            text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+            
+            # 确保文本在图像范围内
+            text_x = max(10, min(center_x - text_size[0]//2, image.shape[1] - text_size[0] - 10))
+            text_y = max(text_size[1] + 10, center_y - 30)
+            
+            # 绘制背景矩形
+            cv2.rectangle(image, 
+                         (text_x - 5, text_y - text_size[1] - 5),
+                         (text_x + text_size[0] + 5, text_y + 5),
+                         (0, 0, 0), -1)
+            
+            # 绘制文本
+            cv2.putText(image, text, (text_x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            
+            return image
+            
+        except Exception as e:
+            self.logger.warning(f"预测可视化失败: {e}")
+            return image
+    
+    def get_prediction_stats(self) -> dict:
+        """获取预测统计信息"""
+        return self.prediction_stats.copy()
+    
+    def _try_quadrant_detection(self, color_frame: np.ndarray, depth_frame: np.ndarray, 
+                               vis_image: np.ndarray) -> Tuple[Optional[List], Optional[np.ndarray], bool]:
+        """
+        尝试四象限检测方法
+        
+        Returns:
+            line_params_list, global_axis, success
+        """
+        try:
+            # 1. 图像预处理
+            gray = cv2.cvtColor(color_frame, cv2.COLOR_BGR2GRAY)
+            h, w = color_frame.shape[:2]
+            
+            # 2. 边缘检测
+            edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+            
+            # 3. 四象限分析（原有代码逻辑）
+            mid_x, mid_y = w // 2, h // 2
+            quadrants = [
+                ("Q1", edges[0:mid_y, mid_x:w]),        # 右上
+                ("Q2", edges[0:mid_y, 0:mid_x]),        # 左上  
+                ("Q3", edges[mid_y:h, 0:mid_x]),        # 左下
+                ("Q4", edges[mid_y:h, mid_x:w])         # 右下
+            ]
+            
+            line_params_list = []
+            valid_lines = []
+            quadrant_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+            
+            for i, (q_name, quad_edges) in enumerate(quadrants):
+                # 在象限中检测直线
+                lines = cv2.HoughLinesP(
+                    quad_edges,
+                    rho=1,
+                    theta=np.pi/180,
+                    threshold=50,
+                    minLineLength=30,
+                    maxLineGap=20
+                )
+                
+                if lines is not None and len(lines) > 0:
+                    # 找到最长的直线
+                    best_line = None
+                    max_length = 0
+                    
+                    for line in lines:
+                        x1, y1, x2, y2 = line[0]
+                        length = np.sqrt((x2-x1)**2 + (y2-y1)**2)
+                        if length > max_length:
+                            max_length = length
+                            best_line = line[0]
+                    
+                    if best_line is not None and max_length > 30:
+                        # 转换坐标到全图
+                        x1, y1, x2, y2 = best_line
+                        if i == 0:  # Q1 右上
+                            x1, x2 = x1 + mid_x, x2 + mid_x
+                        elif i == 1:  # Q2 左上
+                            pass
+                        elif i == 2:  # Q3 左下
+                            y1, y2 = y1 + mid_y, y2 + mid_y
+                        elif i == 3:  # Q4 右下
+                            x1, x2 = x1 + mid_x, x2 + mid_x
+                            y1, y2 = y1 + mid_y, y2 + mid_y
+                        
+                        line_params_list.append([x1, y1, x2, y2])
+                        valid_lines.append([x1, y1, x2, y2])
+                        
+                        # 可视化
+                        color = quadrant_colors[i]
+                        cv2.line(vis_image, (x1, y1), (x2, y2), color, 2)
+                        cv2.circle(vis_image, (x1, y1), 3, color, -1)
+                        cv2.circle(vis_image, (x2, y2), 3, color, -1)
+                else:
+                    line_params_list.append(None)
+            
+            # 检查检测成功的象限数量
+            detected_count = len(valid_lines)
+            
+            if detected_count >= 2:
+                # 尝试拟合轴线
+                global_axis = self._fit_global_axis(valid_lines)
+                
+                # 在可视化图像上绘制轴线
+                if global_axis is not None and len(global_axis) > 1:
+                    for i in range(len(global_axis)-1):
+                        pt1 = (int(global_axis[i][0]), int(global_axis[i][1]))
+                        pt2 = (int(global_axis[i+1][0]), int(global_axis[i+1][1]))
+                        cv2.line(vis_image, pt1, pt2, (0, 255, 255), 2)
+                
+                cv2.putText(vis_image, f"Quadrants: {detected_count}/4", 
+                           (10, h-20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                
+                return line_params_list, global_axis, True
+            else:
+                cv2.putText(vis_image, "Insufficient quadrant detection", 
+                           (10, h-20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                return line_params_list, None, False
+                
+        except Exception as e:
+            self.logger.warning(f"四象限检测异常: {e}")
+            return None, None, False
+    
+    def _fit_global_axis(self, valid_lines: List) -> Optional[np.ndarray]:
+        """拟合全局管道轴线"""
+        try:
+            if len(valid_lines) < 2:
+                return None
+                
+            # 计算每条线的中点
+            center_points = []
+            for line in valid_lines:
+                x1, y1, x2, y2 = line
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
+                center_points.append([cx, cy])
+            
+            center_points = np.array(center_points)
+            
+            # 使用线性回归拟合轴线
+            if len(center_points) >= 2:
+                # 计算主方向
+                mean_point = np.mean(center_points, axis=0)
+                centered_points = center_points - mean_point
+                
+                # SVD分解得到主方向
+                U, S, Vt = np.linalg.svd(centered_points.T)
+                direction = U[:, 0]
+                
+                # 生成轴线点
+                t_values = np.linspace(-50, 50, 10)
+                axis_points = []
+                for t in t_values:
+                    point = mean_point + t * direction
+                    axis_points.append([point[0], point[1], 0])  # 添加Z坐标
+                
+                return np.array(axis_points)
+            
+        except Exception as e:
+            self.logger.warning(f"轴线拟合失败: {e}")
+            
+        return None
+    
+    def _convert_partial_to_standard_format(self, partial_result: Dict) -> List:
+        """将部分视角结果转换为标准格式"""
+        line_params_list = [None, None, None, None]  # 四个象限
+        
+        if partial_result['pipe_edges']:
+            # 取第一条边缘作为主要检测结果
+            line_params_list[0] = partial_result['pipe_edges'][0]
+            
+        return line_params_list
+    
+    def _estimate_axis_from_partial(self, partial_result: Dict) -> Optional[np.ndarray]:
+        """从部分视角结果估算轴线"""
+        if partial_result['estimated_center'] is None:
+            return None
+            
+        try:
+            center = partial_result['estimated_center']
+            direction = partial_result.get('pipe_direction', 0)
+            
+            # 生成简单的轴线
+            angle_rad = np.radians(direction) if direction is not None else 0
+            
+            axis_points = []
+            for t in range(-30, 31, 10):
+                x = center[0] + t * np.cos(angle_rad)
+                y = center[1] + t * np.sin(angle_rad)
+                axis_points.append([x, y, 0])
+                
+            return np.array(axis_points)
+            
+        except Exception as e:
+            self.logger.warning(f"轴线估算失败: {e}")
+            return None
+    
+    def _perform_direction_prediction(self, global_axis: Optional[np.ndarray], 
+                                    vis_image: np.ndarray) -> Optional[dict]:
+        """执行方向预测（四象限模式）"""
+        prediction_info = None
+        
+        try:
+            if global_axis is not None and len(global_axis) > 0:
+                # 计算管道中心点
+                center_point = np.mean(global_axis, axis=0)[:2]
+                
+                # 计算管道角度
+                if len(global_axis) >= 2:
+                    axis_vector = global_axis[-1][:2] - global_axis[0][:2]
+                    angle = np.degrees(np.arctan2(axis_vector[1], axis_vector[0]))
+                else:
+                    angle = 0.0
+                
+                # 更新方向预测器
+                self.direction_predictor.add_frame_data(
+                    center_point=tuple(center_point),
+                    angle=angle,
+                    timestamp=time.time()
+                )
+                
+                # 获取方向预测
+                prediction = self.direction_predictor.predict_direction()
+                prediction_info = prediction
+                
+                # 更新统计信息
+                self._update_prediction_stats(prediction)
+                
+                # 在可视化图像上添加预测信息
+                vis_image = self._add_prediction_visualization(vis_image, prediction, center_point)
+                
+        except Exception as e:
+            self.logger.warning(f"方向预测处理失败: {e}")
+            
+        return prediction_info
+    
+    def _perform_direction_prediction_from_partial(self, partial_result: Dict, 
+                                                 vis_image: np.ndarray) -> Optional[dict]:
+        """执行方向预测（部分视角模式）"""
+        prediction_info = None
+        
+        try:
+            if partial_result['estimated_center'] is not None:
+                center_point = partial_result['estimated_center']
+                angle = partial_result.get('pipe_direction', 0.0)
+                
+                # 更新方向预测器
+                self.direction_predictor.add_frame_data(
+                    center_point=center_point,
+                    angle=angle,
+                    timestamp=time.time()
+                )
+                
+                # 获取方向预测
+                prediction = self.direction_predictor.predict_direction()
+                prediction_info = prediction
+                
+                # 更新统计信息
+                self._update_prediction_stats(prediction)
+                
+                # 添加预测可视化（如果部分追踪器没有添加的话）
+                if 'prediction' not in str(type(vis_image)):
+                    vis_image = self._add_prediction_visualization(vis_image, prediction, center_point)
+                
+        except Exception as e:
+            self.logger.warning(f"部分视角方向预测失败: {e}")
+            
+        return prediction_info
+    
+    def set_tracking_mode(self, mode: str):
+        """设置追踪模式"""
+        if mode in ["auto", "full_quadrant", "partial_view"]:
+            self.tracking_mode = mode
+            self.logger.info(f"追踪模式设置为: {mode}")
+        else:
+            self.logger.warning(f"不支持的追踪模式: {mode}")
+    
+    def get_tracking_stats(self) -> dict:
+        """获取追踪统计信息"""
+        return {
+            'tracking_mode': self.tracking_mode,
+            'quadrant_failure_count': self.quadrant_failure_count,
+            'prediction_stats': self.prediction_stats.copy()
+        }
 
 if __name__ == "__main__":
     # 示例：假设有彩色图像和深度图像
@@ -248,7 +746,7 @@ if __name__ == "__main__":
     tracker = PipeTracker(depth_threshold=2000, camera_intrinsics=my_camera_intrinsics)
     
     # 使用模拟图像进行测试
-    line_params_list, global_axis_points, vis = tracker.track(color_img_sim, depth_img_sim)
+    line_params_list, global_axis_points, vis, prediction_info = tracker.track(color_img_sim, depth_img_sim)
     
     print("各象限3D直线参数:", line_params_list)
     if global_axis_points is not None:
