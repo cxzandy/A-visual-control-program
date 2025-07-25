@@ -19,14 +19,15 @@ DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
 
 # ========================= 相机配置 =========================
 class CameraConfig:
-    # RealSense D455 相机配置
-    CAMERA_TYPE = "realsense_d455"
+    # 相机配置 - 在Jetson上如果没有RealSense可以使用USB摄像头
+    CAMERA_TYPE = "usb"  # 修改为USB摄像头以支持Jetson部署
+    USB_CAMERA_INDEX = 0  # USB摄像头索引
     
     # 图像分辨率
-    COLOR_WIDTH = 1280
-    COLOR_HEIGHT = 720
-    DEPTH_WIDTH = 1280  
-    DEPTH_HEIGHT = 720
+    COLOR_WIDTH = 640   # 降低分辨率以提高Jetson性能
+    COLOR_HEIGHT = 480
+    DEPTH_WIDTH = 640   
+    DEPTH_HEIGHT = 480
     
     # 帧率
     FPS = 30
@@ -53,6 +54,9 @@ class CameraConfig:
 class RobotConfig:
     # DJI RoboMaster C板通信配置
     
+    # 机器人启用开关 - Jetson部署时可能没有机器人连接
+    ROBOT_ENABLED = False  # 在Jetson上默认禁用机器人
+    
     # 默认串口配置
     SERIAL_PORT = "COM3"  # 默认值，运行时会根据平台调整
     BAUD_RATE = 115200
@@ -78,7 +82,23 @@ class RobotConfig:
         "SENSOR_READ": "3",
         "STATUS_CHECK": "status",
         "RESET": "reset",
-        "STOP": "stop"
+        "STOP": "stop",
+        # 新增：机器人运动控制命令
+        "MOVE_FORWARD": "01",   # 前进
+        "MOVE_BACKWARD": "02",  # 后退
+        "TURN_LEFT": "03",      # 左转
+        "TURN_RIGHT": "04",     # 右转
+        "OBSTACLE_AVOID": "05"  # 避障动作
+    }
+    
+    # 键盘控制映射
+    KEYBOARD_COMMANDS = {
+        'w': "MOVE_FORWARD",    # W键前进
+        's': "MOVE_BACKWARD",   # S键后退
+        'a': "TURN_LEFT",       # A键左转
+        'd': "TURN_RIGHT",      # D键右转
+        ' ': "STOP",            # 空格键停止
+        'q': "QUIT"             # Q键退出
     }
 
 # ========================= 感知算法配置 =========================
@@ -125,9 +145,11 @@ class PredictionConfig:
     CURVATURE_WINDOW = 3  # 曲率计算窗口大小
     CURVE_THRESHOLD = 0.1  # 弯曲检测阈值
     
-    # 方向判断
+    # 方向判断 - 专注于左右转向
     DIRECTION_ANGLE_THRESHOLD = 30  # 方向角度阈值 (度)
     MOVEMENT_THRESHOLD = 5.0  # 最小移动距离阈值 (像素)
+    TURN_DETECTION_ONLY = True  # 仅检测左右转向
+    TURN_SENSITIVITY = 15  # 转向检测敏感度 (度)
     
     # 趋势分析
     TREND_WINDOW = 5  # 趋势分析窗口
@@ -136,12 +158,45 @@ class PredictionConfig:
     # 可视化
     PREDICTION_ARROW_LENGTH = 50  # 预测箭头长度 (像素)
     PREDICTION_COLORS = {
-        'left': (0, 255, 255),    # 黄色
-        'right': (0, 255, 255),   # 黄色
-        'up': (255, 0, 255),      # 紫色
-        'down': (255, 0, 255),    # 紫色
-        'unknown': (128, 128, 128) # 灰色
+        'left': (0, 255, 255),    # 黄色 - 左转
+        'right': (255, 0, 255),   # 紫色 - 右转
+        'straight': (0, 255, 0),  # 绿色 - 直行
+        'unknown': (128, 128, 128) # 灰色 - 未知
     }
+
+# ========================= 控制模式配置 =========================
+class ControlConfig:
+    # 控制模式
+    AUTO_MODE = "auto"      # 自动模式
+    MANUAL_MODE = "manual"  # 手动模式
+    DEFAULT_MODE = AUTO_MODE
+    
+    # 转向控制参数
+    MIN_CONFIDENCE_THRESHOLD = 0.6  # 最小置信度阈值
+    DIRECTION_SMOOTHING = 3          # 方向平滑帧数
+    MANUAL_COMMAND_TIMEOUT = 2.0     # 手动命令超时时间 (秒)
+    
+    # 运动控制参数
+    MOVE_SPEED = 0.5        # 移动速度
+    TURN_SPEED = 0.5        # 转向速度
+    TURN_ANGLE_STEP = 15    # 转向角度步长 (度)
+    
+    # 手动控制命令映射 (Web界面使用)
+    MANUAL_COMMANDS = {
+        'forward': 'MOVE_FORWARD',
+        'backward': 'MOVE_BACKWARD',
+        'left': 'TURN_LEFT',
+        'right': 'TURN_RIGHT', 
+        'stop': 'STOP'
+    }
+    
+    # 键盘控制设置
+    KEYBOARD_CONTROL_ENABLED = True   # 启用键盘控制
+    KEYBOARD_REPEAT_DELAY = 0.1       # 键盘重复延迟 (秒)
+    
+    # 安全设置
+    MAX_CONTINUOUS_COMMAND_TIME = 5.0  # 最大连续命令时间 (秒)
+    EMERGENCY_STOP_KEY = 'q'           # 紧急停止键
 
 # ========================= 运行模式配置 =========================
 class RunModeConfig:

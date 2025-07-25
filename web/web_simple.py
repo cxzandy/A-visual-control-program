@@ -22,6 +22,13 @@ class SystemState:
         self.is_running = False
         self.current_mode = None
         self.current_process = None
+        
+        # 控制相关状态
+        self.control_mode = 'auto'  # auto/manual
+        self.turn_controller = None
+        self.manual_command = None
+        self.last_command_time = 0
+        
         self.system_stats = {
             'camera_status': '未连接',
             'robot_status': '未连接',
@@ -34,8 +41,23 @@ class SystemState:
             'prediction_count': 0
         }
         
+        # 转向控制状态
+        self.turn_stats = {
+            'direction': '直行',
+            'confidence': 0.0,
+            'mode': 'auto',
+            'stats': {
+                'left_turns': 0,
+                'right_turns': 0,
+                'straight_segments': 0
+            }
+        }
+        
     def update_stats(self, **kwargs):
         self.system_stats.update(kwargs)
+        
+    def update_turn_stats(self, **kwargs):
+        self.turn_stats.update(kwargs)
 
 # 创建全局状态实例
 system_state = SystemState()
@@ -52,8 +74,27 @@ def get_status():
         'is_running': system_state.is_running,
         'current_mode': system_state.current_mode,
         'stats': system_state.system_stats,
+        'turn_control': system_state.turn_stats,  # 添加转向控制状态
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
+
+@app.route('/api/start', methods=['POST'])
+def start_system_generic():
+    """启动系统API (通用端点)"""
+    global system_state
+    
+    if system_state.is_running:
+        return jsonify({'success': False, 'message': '系统已在运行中'})
+    
+    try:
+        data = request.get_json()
+        mode = data.get('mode', 'demo') if data else 'demo'
+        
+        # 调用具体的启动函数
+        return start_system(mode)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'启动失败: {str(e)}'})
 
 @app.route('/api/start/<mode>', methods=['GET', 'POST'])
 def start_system(mode):
@@ -341,6 +382,95 @@ def monitor_process():
         except Exception as e:
             print(f"监控进程错误: {e}")
             break
+
+@app.route('/api/control_mode', methods=['POST'])
+def set_control_mode():
+    """设置控制模式（自动/手动）"""
+    try:
+        data = request.get_json()
+        mode = data.get('mode', 'auto')
+        
+        if mode not in ['auto', 'manual']:
+            return jsonify({'status': 'error', 'message': '无效的控制模式'}), 400
+        
+        # 更新本地状态
+        global system_state
+        system_state.control_mode = mode
+        
+        # 如果有主系统实例，也更新主系统
+        if hasattr(app, 'main_system') and app.main_system:
+            app.main_system.set_control_mode(mode)
+        
+        print(f"💡 控制模式切换为: {mode}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'控制模式已切换为{mode}',
+            'mode': mode
+        })
+        
+    except Exception as e:
+        print(f"❌ 设置控制模式错误: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/manual_command', methods=['POST'])
+def manual_command():
+    """手动控制命令"""
+    try:
+        data = request.get_json()
+        command = data.get('command', '')
+        
+        if not command:
+            return jsonify({'status': 'error', 'message': '缺少控制命令'}), 400
+            
+        global system_state
+        
+        # 只在手动模式下执行
+        if system_state.control_mode != 'manual':
+            return jsonify({'status': 'error', 'message': '当前不在手动模式'}), 400
+        
+        # 如果有主系统实例，发送命令到主系统
+        if hasattr(app, 'main_system') and app.main_system:
+            success = app.main_system.send_manual_command(command)
+            if not success:
+                return jsonify({'status': 'error', 'message': '命令发送失败'}), 500
+        else:
+            # 没有主系统时，直接记录命令（用于测试）
+            print(f"📝 记录手动命令: {command}")
+        
+        # 设置手动命令和时间戳
+        system_state.manual_command = command
+        system_state.last_command_time = time.time()
+        
+        print(f"🎮 手动控制命令: {command}")
+        
+        # 返回包含机器人命令码的响应
+        try:
+            # 添加src目录到路径
+            import sys
+            import os
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            sys.path.insert(0, os.path.join(project_root, 'src'))
+            
+            from config import ControlConfig, RobotConfig
+            robot_cmd = None
+            if command in ControlConfig.MANUAL_COMMANDS:
+                cmd_name = ControlConfig.MANUAL_COMMANDS[command]
+                if cmd_name in RobotConfig.COMMANDS:
+                    robot_cmd = RobotConfig.COMMANDS[cmd_name]
+        except ImportError:
+            robot_cmd = None
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'执行手动命令: {command}',
+            'command': command,
+            'robot_command': robot_cmd
+        })
+        
+    except Exception as e:
+        print(f"❌ 手动控制错误: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     # 设置项目根目录和模板目录

@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (
     CameraConfig, RobotConfig, PerceptionConfig, 
     RunModeConfig, LogConfig, SafetyConfig, OutputConfig,
+    ControlConfig, PredictionConfig,
     validate_config, print_config_summary
 )
 
@@ -40,8 +41,10 @@ from camera.point_cloud_generator import PointCloudGenerator
 from robot.communication import RoboMasterCSerial
 from perception.obstacle_detection import ObstacleDetector
 from perception.pipe_tracking import PipeTracker
+from control.turn_control import TurnControlManager
 from utils.logger import setup_logger
 from utils.display import DisplayManager
+from utils.keyboard_control import KeyboardController
 
 class Tiaozhanbei2System:
     """挑战杯2.0 系统主类"""
@@ -64,6 +67,10 @@ class Tiaozhanbei2System:
         # 算法组件
         self.obstacle_detector = None
         self.pipe_tracker = None
+        self.turn_controller = None
+        
+        # 控制组件
+        self.keyboard_controller = None
         
         # 系统状态
         self.system_status = {
@@ -72,7 +79,12 @@ class Tiaozhanbei2System:
             "calibration_loaded": False,
             "processing_fps": 0.0,
             "total_frames": 0,
-            "error_count": 0
+            "error_count": 0,
+            "control_mode": "auto",
+            "turn_direction": "straight",
+            "turn_confidence": 0.0,
+            "keyboard_control_enabled": False,
+            "last_keyboard_command": None
         }
         
         # 注册信号处理器
@@ -91,29 +103,48 @@ class Tiaozhanbei2System:
         
         # 1. 检查相机连接
         try:
-            if check_realsense_connection():
-                self.camera = RealSenseCapture()
-                self.system_status["camera_connected"] = True
-                self.logger.info("相机连接成功")
+            if CameraConfig.CAMERA_TYPE == "usb":
+                # 使用USB摄像头
+                import cv2
+                test_cap = cv2.VideoCapture(CameraConfig.USB_CAMERA_INDEX)
+                if test_cap.isOpened():
+                    test_cap.release()
+                    # 这里需要创建USB摄像头类，暂时使用RealSense类作为占位符
+                    self.camera = RealSenseCapture()  # TODO: 替换为USB摄像头类
+                    self.system_status["camera_connected"] = True
+                    self.logger.info("USB摄像头连接成功")
+                else:
+                    self.logger.error("USB摄像头连接失败")
+                    return False
             else:
-                self.logger.error("相机连接失败")
-                return False
+                # 使用RealSense摄像头
+                if check_realsense_connection():
+                    self.camera = RealSenseCapture()
+                    self.system_status["camera_connected"] = True
+                    self.logger.info("RealSense相机连接成功")
+                else:
+                    self.logger.error("RealSense相机连接失败")
+                    return False
         except Exception as e:
             self.logger.error(f"相机初始化失败: {e}")
             return False
             
-        # 2. 初始化机器人通信
-        try:
-            self.robot = RoboMasterCSerial(
-                port=RobotConfig.SERIAL_PORT,
-                baudrate=RobotConfig.BAUD_RATE,
-                timeout=RobotConfig.TIMEOUT
-            )
-            self.system_status["robot_connected"] = True
-            self.logger.info("机器人通信连接成功")
-        except Exception as e:
-            self.logger.warning(f"机器人通信连接失败: {e}")
-            self.robot = None  # 允许无机器人模式运行
+        # 2. 初始化机器人通信（如果启用）
+        if RobotConfig.ROBOT_ENABLED:
+            try:
+                self.robot = RoboMasterCSerial(
+                    port=RobotConfig.SERIAL_PORT,
+                    baudrate=RobotConfig.BAUD_RATE,
+                    timeout=RobotConfig.TIMEOUT
+                )
+                self.system_status["robot_connected"] = True
+                self.logger.info("机器人通信连接成功")
+            except Exception as e:
+                self.logger.warning(f"机器人通信连接失败: {e}")
+                self.robot = None
+        else:
+            self.logger.info("机器人功能已禁用（配置设置）")
+            self.robot = None
             
         # 3. 初始化深度估计器
         try:
@@ -147,6 +178,18 @@ class Tiaozhanbei2System:
                 depth_threshold=PerceptionConfig.PIPE_DEPTH_THRESHOLD,
                 camera_intrinsics=self._load_camera_intrinsics()
             )
+            
+            # 转向控制管理器
+            self.turn_controller = TurnControlManager()
+            
+            # 键盘控制器
+            self.keyboard_controller = KeyboardController(
+                robot_comm=self.robot,
+                logger=self.logger
+            )
+            
+            # 设置键盘命令回调
+            self.keyboard_controller.set_command_callback(self._on_keyboard_command)
             
             self.logger.info("算法组件初始化成功")
             return True
@@ -204,6 +247,11 @@ class Tiaozhanbei2System:
             self.logger.error("相机未连接，无法运行追踪模式")
             return False
             
+        # 启用键盘控制
+        if ControlConfig.KEYBOARD_CONTROL_ENABLED:
+            self.enable_keyboard_control()
+            self.logger.info("键盘控制已启用 - WASD控制, Q退出, M切换模式")
+            
         self.running = True
         frame_count = 0
         start_time = time.time()
@@ -222,9 +270,12 @@ class Tiaozhanbei2System:
                 obstacle_mask = self.obstacle_detector.detect(depth_frame)
                 
                 # 管道追踪（包含方向预测）
-                line_params, global_axis, vis_image, prediction_info = self.pipe_tracker.track(
-                    color_frame, depth_frame
-                )
+                result = self.pipe_tracker.track(color_frame, depth_frame)
+                if isinstance(result, tuple) and len(result) >= 3:
+                    line_params, global_axis, vis_image = result[:3]
+                    prediction_info = result[3] if len(result) > 3 else None
+                else:
+                    line_params, global_axis, vis_image, prediction_info = None, None, color_frame, None
                 
                 # 处理结果
                 self._process_tracking_results(
@@ -256,16 +307,28 @@ class Tiaozhanbei2System:
             
         finally:
             self.running = False
+            # 禁用键盘控制
+            self.disable_keyboard_control()
             
         self.logger.info(f"追踪模式结束，共处理 {frame_count} 帧")
         return True
         
     def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image, prediction_info=None):
-        """处理追踪结果（包含方向预测）"""
+        """处理追踪结果（集成转向控制）"""
         try:
+            # 转向检测和控制决策
+            turn_result = self.turn_controller.process_frame(
+                vis_image, line_params, global_axis
+            )
+            
+            # 更新系统状态
+            self.system_status["turn_direction"] = turn_result["direction"]
+            self.system_status["turn_confidence"] = turn_result["confidence"]
+            self.system_status["control_mode"] = self.turn_controller.control_mode
+            
             # 发送控制命令到机器人
             if self.robot and self.system_status["robot_connected"]:
-                self._send_robot_commands(obstacle_mask, line_params, global_axis, prediction_info)
+                self._send_robot_commands(obstacle_mask, turn_result)
                 
             # 显示结果
             if RunModeConfig.DISPLAY_ENABLED and vis_image is not None:
@@ -279,77 +342,109 @@ class Tiaozhanbei2System:
                 status_info = {
                     "Camera": "OK" if self.system_status["camera_connected"] else "ERROR",
                     "Robot": "OK" if self.system_status["robot_connected"] else "DISCONNECTED",
-                    "Frames": self.system_status["total_frames"]
+                    "Frames": self.system_status["total_frames"],
+                    "Mode": self.system_status["control_mode"].upper(),
+                    "Turn": f"{turn_result['direction']} ({turn_result['confidence']:.2f})",
+                    "Keyboard": "ON" if self.system_status["keyboard_control_enabled"] else "OFF"
                 }
                 
-                # 添加方向预测信息
-                if prediction_info:
-                    prediction_stats = self.pipe_tracker.get_prediction_stats()
+                # 添加最后键盘命令
+                if self.system_status["last_keyboard_command"]:
+                    status_info["LastKey"] = self.system_status["last_keyboard_command"]
+                
+                # 添加转向控制统计
+                turn_stats = self.turn_controller.get_statistics()
+                if turn_stats:
                     status_info.update({
-                        "Prediction": f"{prediction_info['direction']} ({prediction_info['confidence']:.2f})",
-                        "Pred.Acc": f"{prediction_stats['prediction_accuracy']:.2f}"
+                        "Left": f"{turn_stats['left_count']}",
+                        "Right": f"{turn_stats['right_count']}",
+                        "Straight": f"{turn_stats['straight_count']}"
                     })
+                
+                # 添加键盘控制统计
+                if self.keyboard_controller:
+                    kb_stats = self.keyboard_controller.get_statistics()
+                    if kb_stats["total_commands"] > 0:
+                        status_info["KB_Cmds"] = str(kb_stats["total_commands"])
                 
                 display_image = add_status_overlay(display_image, status_info, start_y=60)
                 
                 # 显示图像
-                key = self.display.show_image("Pipe Tracking", display_image)
+                key = self.display.show_image("Turn Control Tracking", display_image)
                 if key == ord('q'):
                     self.running = False
+                elif key == ord('m'):
+                    # 切换控制模式
+                    new_mode = "manual" if self.turn_controller.control_mode == "auto" else "auto"
+                    self.turn_controller.set_control_mode(new_mode)
+                    self.logger.info(f"控制模式切换为: {new_mode}")
                     
             # 保存结果
             if RunModeConfig.SAVE_RESULTS:
-                self._save_results(vis_image, obstacle_mask, line_params, prediction_info)
+                self._save_results(vis_image, obstacle_mask, line_params, turn_result)
                 
         except Exception as e:
             self.logger.error(f"处理追踪结果失败: {e}")
             
-    def _send_robot_commands(self, obstacle_mask, line_params, global_axis, prediction_info=None):
-        """向机器人发送控制命令（包含方向预测）"""
+    def _send_robot_commands(self, obstacle_mask, turn_result):
+        """向机器人发送控制命令（基于转向控制）"""
         try:
             import numpy as np
             
-            # 简单的控制逻辑示例
+            # 安全检查：障碍物检测
             if np.sum(obstacle_mask > 0) > PerceptionConfig.OBSTACLE_MIN_AREA:
-                # 检测到障碍物，发送停止命令
-                self.robot.send(RobotConfig.COMMANDS["STOP"])
-                self.logger.warning("检测到障碍物，发送停止命令")
-            elif line_params and any(p is not None for p in line_params):
-                # 检测到管道，根据预测方向发送相应命令
-                if prediction_info and prediction_info.get('confidence', 0) > 0.6:
-                    direction = prediction_info['direction']
-                    confidence = prediction_info['confidence']
-                    
-                    # 根据预测方向发送对应命令
-                    if direction == 'left':
-                        self.robot.send("turn_left")
-                        self.logger.info(f"预测左转，置信度: {confidence:.2f}")
-                    elif direction == 'right':
-                        self.robot.send("turn_right")
-                        self.logger.info(f"预测右转，置信度: {confidence:.2f}")
-                    elif direction == 'up':
-                        self.robot.send("move_up")
-                        self.logger.info(f"预测上升，置信度: {confidence:.2f}")
-                    elif direction == 'down':
-                        self.robot.send("move_down")
-                        self.logger.info(f"预测下降，置信度: {confidence:.2f}")
-                    else:
-                        self.robot.send("track_pipe")
-                        self.logger.debug("直线跟踪")
+                self.robot.send(RobotConfig.COMMANDS["OBSTACLE_AVOID"])  # 发送05
+                self.logger.warning("检测到障碍物，发送避障命令 (05)")
+                return
+                
+            # 根据控制模式发送命令
+            if self.turn_controller.control_mode == "manual":
+                # 手动模式：执行手动命令
+                manual_cmd = self.turn_controller.get_manual_command()
+                if manual_cmd:
+                    if manual_cmd == "left":
+                        self.robot.send(RobotConfig.COMMANDS["TURN_LEFT"])  # 发送03
+                        self.logger.info("执行手动左转命令 (03)")
+                    elif manual_cmd == "right":
+                        self.robot.send(RobotConfig.COMMANDS["TURN_RIGHT"])  # 发送04
+                        self.logger.info("执行手动右转命令 (04)")
+                    elif manual_cmd == "forward":
+                        self.robot.send(RobotConfig.COMMANDS["MOVE_FORWARD"])  # 发送01
+                        self.logger.info("执行手动前进命令 (01)")
+                    elif manual_cmd == "backward":
+                        self.robot.send(RobotConfig.COMMANDS["MOVE_BACKWARD"])  # 发送02
+                        self.logger.info("执行手动后退命令 (02)")
+                    elif manual_cmd == "stop":
+                        self.robot.send(RobotConfig.COMMANDS["STOP"])
+                        self.logger.info("执行手动停止命令")
                 else:
-                    # 置信度不足，使用基本跟踪
-                    self.robot.send("track_pipe")
-                    self.logger.debug("发送管道跟踪命令")
+                    # 无手动命令时保持当前状态
+                    pass
             else:
-                # 无目标，发送搜索命令
-                self.robot.send("search")
-                self.logger.debug("发送搜索命令")
+                # 自动模式：根据转向检测结果发送命令
+                direction = turn_result["direction"]
+                confidence = turn_result["confidence"]
+                
+                if confidence > ControlConfig.MIN_CONFIDENCE_THRESHOLD:
+                    if direction == "left":
+                        self.robot.send(RobotConfig.COMMANDS["TURN_LEFT"])  # 发送03
+                        self.logger.info(f"自动左转，置信度: {confidence:.2f} (03)")
+                    elif direction == "right":
+                        self.robot.send(RobotConfig.COMMANDS["TURN_RIGHT"])  # 发送04
+                        self.logger.info(f"自动右转，置信度: {confidence:.2f} (04)")
+                    else:
+                        self.robot.send(RobotConfig.COMMANDS["MOVE_FORWARD"])  # 发送01
+                        self.logger.debug("直线前进 (01)")
+                else:
+                    # 置信度不足，保持当前状态或搜索
+                    self.robot.send(RobotConfig.COMMANDS["STOP"])
+                    self.logger.debug("置信度不足，发送停止命令")
                 
         except Exception as e:
             self.logger.error(f"发送机器人命令失败: {e}")
             
-    def _save_results(self, vis_image, obstacle_mask, line_params, prediction_info=None):
-        """保存处理结果（包含预测信息）"""
+    def _save_results(self, vis_image, obstacle_mask, line_params, turn_result):
+        """保存处理结果（包含转向控制信息）"""
         try:
             import cv2
             import json
@@ -360,25 +455,120 @@ class Tiaozhanbei2System:
             if vis_image is not None:
                 image_path = os.path.join(
                     OutputConfig.IMAGES_DIR,
-                    f"tracking_{timestamp}.jpg"
+                    f"turn_tracking_{timestamp}.jpg"
                 )
                 cv2.imwrite(image_path, vis_image)
                 
-            # 保存预测信息
-            if prediction_info:
+            # 保存转向控制信息
+            if turn_result:
                 json_path = os.path.join(
                     OutputConfig.LOGS_DIR,
-                    f"prediction_{timestamp}.json"
+                    f"turn_control_{timestamp}.json"
                 )
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump({
-                        'timestamp': timestamp,
-                        'prediction': prediction_info,
-                        'tracking_stats': self.pipe_tracker.get_prediction_stats()
-                    }, f, ensure_ascii=False, indent=2)
                 
+                save_data = {
+                    "timestamp": timestamp,
+                    "turn_result": turn_result,
+                    "control_mode": self.turn_controller.control_mode,
+                    "statistics": self.turn_controller.get_statistics()
+                }
+                
+                with open(json_path, 'w') as f:
+                    json.dump(save_data, f, indent=2)
+                    
         except Exception as e:
             self.logger.error(f"保存结果失败: {e}")
+            
+    def set_control_mode(self, mode: str) -> bool:
+        """设置控制模式（供Web界面调用）"""
+        try:
+            if self.turn_controller:
+                self.turn_controller.set_control_mode(mode)
+                self.system_status["control_mode"] = mode
+                self.logger.info(f"控制模式已切换为: {mode}")
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"设置控制模式失败: {e}")
+            return False
+            
+    def send_manual_command(self, command: str) -> bool:
+        """发送手动控制命令（供Web界面调用）"""
+        try:
+            if self.turn_controller and self.turn_controller.control_mode == "manual":
+                self.turn_controller.set_manual_command(command)
+                self.logger.info(f"接收到手动命令: {command}")
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"发送手动命令失败: {e}")
+            return False
+            
+    def get_system_state(self) -> Dict[str, Any]:
+        """获取系统状态（供Web界面调用）"""
+        try:
+            state = self.system_status.copy()
+            if self.turn_controller:
+                state.update({
+                    "turn_statistics": self.turn_controller.get_statistics(),
+                    "manual_command": self.turn_controller.manual_command
+                })
+            return state
+        except Exception as e:
+            self.logger.error(f"获取系统状态失败: {e}")
+            return {}
+            
+    def _on_keyboard_command(self, command: str):
+        """键盘命令回调函数"""
+        try:
+            self.system_status["last_keyboard_command"] = command
+            self.logger.info(f"键盘控制命令: {command}")
+            
+            # 如果是手动模式，直接执行键盘命令
+            if (self.turn_controller and 
+                self.turn_controller.control_mode == "manual"):
+                
+                # 将机器人命令转换为手动控制命令
+                manual_cmd = self._robot_cmd_to_manual_cmd(command)
+                if manual_cmd:
+                    self.turn_controller.set_manual_command(manual_cmd)
+                    
+        except Exception as e:
+            self.logger.error(f"处理键盘命令失败: {e}")
+            
+    def _robot_cmd_to_manual_cmd(self, robot_cmd: str) -> Optional[str]:
+        """将机器人命令转换为手动控制命令"""
+        cmd_mapping = {
+            RobotConfig.COMMANDS["MOVE_FORWARD"]: "forward",
+            RobotConfig.COMMANDS["MOVE_BACKWARD"]: "backward", 
+            RobotConfig.COMMANDS["TURN_LEFT"]: "left",
+            RobotConfig.COMMANDS["TURN_RIGHT"]: "right",
+            RobotConfig.COMMANDS["STOP"]: "stop"
+        }
+        return cmd_mapping.get(robot_cmd)
+        
+    def enable_keyboard_control(self):
+        """启用键盘控制"""
+        try:
+            if self.keyboard_controller and ControlConfig.KEYBOARD_CONTROL_ENABLED:
+                self.keyboard_controller.start_keyboard_control()
+                self.system_status["keyboard_control_enabled"] = True
+                self.logger.info("键盘控制已启用")
+                return True
+            return False
+        except Exception as e:
+            self.logger.error(f"启用键盘控制失败: {e}")
+            return False
+            
+    def disable_keyboard_control(self):
+        """禁用键盘控制"""
+        try:
+            if self.keyboard_controller:
+                self.keyboard_controller.stop_keyboard_control()
+                self.system_status["keyboard_control_enabled"] = False
+                self.logger.info("键盘控制已禁用")
+        except Exception as e:
+            self.logger.error(f"禁用键盘控制失败: {e}")
             
     def _safety_check(self) -> bool:
         """安全检查"""
@@ -437,7 +627,13 @@ class Tiaozhanbei2System:
                 if color_frame is not None and depth_frame is not None:
                     # 简单处理
                     obstacle_mask = self.obstacle_detector.detect(depth_frame)
-                    line_params, _, vis_image = self.pipe_tracker.track(color_frame, depth_frame)
+                    result = self.pipe_tracker.track(color_frame, depth_frame)
+                    
+                    # 安全解包结果
+                    if isinstance(result, tuple) and len(result) >= 3:
+                        line_params, _, vis_image = result[:3]
+                    else:
+                        line_params, vis_image = None, color_frame
                     
                     # 计算FPS
                     frame_count += 1
@@ -489,6 +685,9 @@ class Tiaozhanbei2System:
         self.logger.info("正在清理系统资源...")
         
         try:
+            # 禁用键盘控制
+            self.disable_keyboard_control()
+            
             if self.camera:
                 self.camera.stop()
                 

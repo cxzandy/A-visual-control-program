@@ -158,6 +158,130 @@
             transform: none;
         }
         
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        
+        /* 控制模式样式 */
+        .control-modes {
+            margin: 20px 0;
+        }
+        
+        .control-modes h4 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .mode-selector .mode-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+        }
+        
+        .mode-selector .mode-btn small {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        
+        /* 手动控制面板 */
+        .manual-controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .manual-controls h4 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        
+        .direction-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .direction-btn {
+            padding: 15px;
+            font-size: 1.1em;
+            border-radius: 8px;
+        }
+        
+        .direction-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* 转向状态显示 */
+        .turn-status {
+            margin: 20px 0;
+            padding: 20px;
+            background: #e8f4f8;
+            border-radius: 10px;
+            border: 2px solid #b8daff;
+        }
+        
+        .turn-status h4 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .status-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .status-value {
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
         .image-display {
             background: white;
             border-radius: 15px;
@@ -322,6 +446,63 @@
                 <button class="btn btn-primary" id="start-btn">🚀 启动系统</button>
                 <button class="btn btn-danger" id="stop-btn" disabled>⏹️ 停止系统</button>
             </div>
+            
+            <!-- 控制模式选择 -->
+            <div class="control-modes">
+                <h4>🎮 控制模式</h4>
+                <div class="mode-selector">
+                    <button class="btn mode-btn active" data-control-mode="auto">
+                        🤖 自动模式
+                        <small>AI自动检测转向</small>
+                    </button>
+                    <button class="btn mode-btn" data-control-mode="manual">
+                        🎮 手动模式  
+                        <small>手动控制转向</small>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 手动控制面板 -->
+            <div class="manual-controls hidden" id="manual-controls">
+                <h4>🕹️ 手动控制</h4>
+                <div class="direction-buttons">
+                    <button class="btn btn-warning direction-btn" data-direction="left">
+                        ⬅️ 左转
+                    </button>
+                    <button class="btn btn-success direction-btn" data-direction="straight">
+                        ⬆️ 直行
+                    </button>
+                    <button class="btn btn-warning direction-btn" data-direction="right">
+                        ➡️ 右转
+                    </button>
+                    <button class="btn btn-danger direction-btn" data-direction="stop">
+                        ⏹️ 停止
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 转向状态显示 -->
+            <div class="turn-status">
+                <h4>🧭 转向状态</h4>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">当前方向:</span>
+                        <span class="status-value" id="current-direction">直行</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">置信度:</span>
+                        <span class="status-value" id="turn-confidence">0%</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">检测模式:</span>
+                        <span class="status-value" id="detection-mode">自动</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">转向统计:</span>
+                        <span class="status-value" id="turn-stats">左:0 右:0 直:0</span>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- 图像显示 -->
@@ -347,6 +528,7 @@
     <script>
         // 全局变量
         let currentMode = 'demo';
+        let controlMode = 'auto';  // 控制模式：auto/manual
         let isRunning = false;
         let updateInterval = null;
         
@@ -354,10 +536,19 @@
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
         const modeButtons = document.querySelectorAll('.mode-btn');
+        const controlModeButtons = document.querySelectorAll('[data-control-mode]');
+        const directionButtons = document.querySelectorAll('.direction-btn');
+        const manualControls = document.getElementById('manual-controls');
         const cameraImage = document.getElementById('camera-image');
         const noImageDiv = document.getElementById('no-image');
         const logsDiv = document.getElementById('logs');
         const alertContainer = document.getElementById('alert-container');
+        
+        // 状态显示元素
+        const currentDirectionSpan = document.getElementById('current-direction');
+        const turnConfidenceSpan = document.getElementById('turn-confidence');
+        const detectionModeSpan = document.getElementById('detection-mode');
+        const turnStatsSpan = document.getElementById('turn-stats');
         
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -367,14 +558,51 @@
         
         // 设置事件监听器
         function setupEventListeners() {
-            // 模式选择
+            // 运行模式选择
             modeButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     if (!isRunning) {
                         modeButtons.forEach(b => b.classList.remove('active'));
                         this.classList.add('active');
                         currentMode = this.dataset.mode;
-                        addLog(`选择模式: ${this.textContent.trim()}`);
+                        addLog(`选择运行模式: ${this.textContent.trim()}`);
+                    }
+                });
+            });
+            
+            // 控制模式选择
+            controlModeButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    controlModeButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    controlMode = this.dataset.controlMode;
+                    
+                    // 显示/隐藏手动控制面板
+                    if (controlMode === 'manual') {
+                        manualControls.classList.remove('hidden');
+                        addLog('切换到手动控制模式');
+                    } else {
+                        manualControls.classList.add('hidden');
+                        addLog('切换到自动控制模式');
+                    }
+                    
+                    // 发送控制模式到后端
+                    setControlMode(controlMode);
+                });
+            });
+            
+            // 方向控制按钮
+            directionButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (controlMode === 'manual' && isRunning) {
+                        const direction = this.dataset.direction;
+                        sendManualCommand(direction);
+                        addLog(`手动控制: ${this.textContent.trim()}`);
+                        
+                        // 高亮按钮效果
+                        directionButtons.forEach(b => b.classList.remove('btn-info'));
+                        this.classList.add('btn-info');
+                        setTimeout(() => this.classList.remove('btn-info'), 200);
                     }
                 });
             });
@@ -455,6 +683,48 @@
             } catch (error) {
                 showAlert('连接服务器失败', 'error');
                 addLog(`连接错误: ${error.message}`);
+            }
+        }
+        
+        // 设置控制模式
+        async function setControlMode(mode) {
+            try {
+                const response = await fetch('/api/control_mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ mode: mode })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    addLog(`控制模式已设置为: ${mode}`);
+                } else {
+                    addLog(`设置控制模式失败: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`设置控制模式错误: ${error.message}`);
+            }
+        }
+        
+        // 发送手动命令
+        async function sendManualCommand(direction) {
+            try {
+                const response = await fetch('/api/manual_command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command: direction })
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    addLog(`手动命令失败: ${result.message}`);
+                }
+            } catch (error) {
+                addLog(`发送手动命令错误: ${error.message}`);
             }
         }
         
