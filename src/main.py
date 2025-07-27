@@ -170,7 +170,10 @@ class Tiaozhanbei2System:
         try:
             # 障碍物检测器
             self.obstacle_detector = ObstacleDetector(
-                depth_threshold=PerceptionConfig.OBSTACLE_DEPTH_THRESHOLD
+                depth_threshold=PerceptionConfig.OBSTACLE_DEPTH_THRESHOLD * 1000,  # 转换为mm
+                center_region_width=PerceptionConfig.OBSTACLE_CENTER_REGION_WIDTH,
+                critical_distance=PerceptionConfig.OBSTACLE_CRITICAL_DISTANCE * 1000,  # 转换为mm
+                warning_distance=PerceptionConfig.OBSTACLE_WARNING_DISTANCE * 1000  # 转换为mm
             )
             
             # 管道追踪器
@@ -268,6 +271,7 @@ class Tiaozhanbei2System:
                 
                 # 障碍物检测
                 obstacle_mask = self.obstacle_detector.detect(depth_frame)
+                obstacle_analysis = self.obstacle_detector.analyze_obstacle_threat(depth_frame, obstacle_mask)
                 
                 # 管道追踪（包含方向预测）
                 result = self.pipe_tracker.track(color_frame, depth_frame)
@@ -279,7 +283,7 @@ class Tiaozhanbei2System:
                 
                 # 处理结果
                 self._process_tracking_results(
-                    obstacle_mask, line_params, global_axis, vis_image, prediction_info
+                    obstacle_mask, line_params, global_axis, vis_image, prediction_info, obstacle_analysis
                 )
                 
                 # 更新统计信息
@@ -313,7 +317,7 @@ class Tiaozhanbei2System:
         self.logger.info(f"追踪模式结束，共处理 {frame_count} 帧")
         return True
         
-    def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image, prediction_info=None):
+    def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image, prediction_info=None, obstacle_analysis=None):
         """处理追踪结果（集成转向控制）"""
         try:
             # 转向检测和控制决策
@@ -328,7 +332,7 @@ class Tiaozhanbei2System:
             
             # 发送控制命令到机器人
             if self.robot and self.system_status["robot_connected"]:
-                self._send_robot_commands(obstacle_mask, turn_result)
+                self._send_robot_commands(obstacle_mask, turn_result, obstacle_analysis)
                 
             # 显示结果
             if RunModeConfig.DISPLAY_ENABLED and vis_image is not None:
@@ -381,20 +385,36 @@ class Tiaozhanbei2System:
                     
             # 保存结果
             if RunModeConfig.SAVE_RESULTS:
-                self._save_results(vis_image, obstacle_mask, line_params, turn_result)
+                self._save_results(vis_image, obstacle_mask, line_params, turn_result, obstacle_analysis)
                 
         except Exception as e:
             self.logger.error(f"处理追踪结果失败: {e}")
             
-    def _send_robot_commands(self, obstacle_mask, turn_result):
-        """向机器人发送控制命令（基于转向控制）"""
+    def _send_robot_commands(self, obstacle_mask, turn_result, obstacle_analysis=None):
+        """向机器人发送控制命令（基于转向控制和智能避障）"""
         try:
             import numpy as np
             
-            # 安全检查：障碍物检测
-            if np.sum(obstacle_mask > 0) > PerceptionConfig.OBSTACLE_MIN_AREA:
+            # 智能安全检查：障碍物威胁分析
+            if obstacle_analysis:
+                threat_level = obstacle_analysis["threat_level"]
+                min_distance = obstacle_analysis["min_distance"]
+                
+                if threat_level == "critical":
+                    self.robot.send(RobotConfig.COMMANDS["OBSTACLE_AVOID"])  # 发送05
+                    self.logger.error(f"紧急避障！检测到严重威胁，距离: {min_distance:.0f}mm (05)")
+                    return
+                elif threat_level == "warning":
+                    self.robot.send(RobotConfig.COMMANDS["OBSTACLE_AVOID"])  # 发送05
+                    self.logger.warning(f"警告避障！检测到障碍物威胁，距离: {min_distance:.0f}mm (05)")
+                    return
+                elif threat_level == "caution":
+                    self.logger.info(f"注意：前方有障碍物，距离: {min_distance:.0f}mm，继续监控")
+            
+            # 备用安全检查：基于面积的传统检测
+            elif np.sum(obstacle_mask > 0) > PerceptionConfig.OBSTACLE_MIN_AREA:
                 self.robot.send(RobotConfig.COMMANDS["OBSTACLE_AVOID"])  # 发送05
-                self.logger.warning("检测到障碍物，发送避障命令 (05)")
+                self.logger.warning("检测到障碍物（传统检测），发送避障命令 (05)")
                 return
                 
             # 根据控制模式发送命令
@@ -443,8 +463,8 @@ class Tiaozhanbei2System:
         except Exception as e:
             self.logger.error(f"发送机器人命令失败: {e}")
             
-    def _save_results(self, vis_image, obstacle_mask, line_params, turn_result):
-        """保存处理结果（包含转向控制信息）"""
+    def _save_results(self, vis_image, obstacle_mask, line_params, turn_result, obstacle_analysis=None):
+        """保存处理结果（包含转向控制和障碍物检测信息）"""
         try:
             import cv2
             import json
@@ -453,28 +473,33 @@ class Tiaozhanbei2System:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             if vis_image is not None:
+                # 在可视化图像上绘制障碍物信息
+                if obstacle_analysis:
+                    vis_image = self.obstacle_detector.draw_obstacles(vis_image, obstacle_mask, obstacle_analysis)
+                    
                 image_path = os.path.join(
                     OutputConfig.IMAGES_DIR,
                     f"turn_tracking_{timestamp}.jpg"
                 )
                 cv2.imwrite(image_path, vis_image)
                 
-            # 保存转向控制信息
-            if turn_result:
+            # 保存转向控制和障碍物检测信息
+            if turn_result or obstacle_analysis:
                 json_path = os.path.join(
                     OutputConfig.LOGS_DIR,
-                    f"turn_control_{timestamp}.json"
+                    f"detection_results_{timestamp}.json"
                 )
                 
                 save_data = {
                     "timestamp": timestamp,
                     "turn_result": turn_result,
+                    "obstacle_analysis": obstacle_analysis,
                     "control_mode": self.turn_controller.control_mode,
                     "statistics": self.turn_controller.get_statistics()
                 }
                 
                 with open(json_path, 'w') as f:
-                    json.dump(save_data, f, indent=2)
+                    json.dump(save_data, f, indent=2, default=str)
                     
         except Exception as e:
             self.logger.error(f"保存结果失败: {e}")

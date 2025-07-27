@@ -106,6 +106,9 @@ class PerceptionConfig:
     # 障碍物检测
     OBSTACLE_DEPTH_THRESHOLD = 1.0  # 障碍物深度阈值 (米)
     OBSTACLE_MIN_AREA = 100  # 最小障碍物面积 (像素)
+    OBSTACLE_CRITICAL_DISTANCE = 0.5  # 紧急停车距离 (米)
+    OBSTACLE_WARNING_DISTANCE = 1.5  # 警告距离 (米)
+    OBSTACLE_CENTER_REGION_WIDTH = 0.3  # 中央区域比例（0-1）用于前方障碍物检测
     
     # 管道追踪
     PIPE_DEPTH_THRESHOLD = 1.5  # 管道深度阈值 (米)
