@@ -19,9 +19,9 @@ DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
 
 # ========================= 相机配置 =========================
 class CameraConfig:
-    # 相机配置 - 在Jetson上如果没有RealSense可以使用USB摄像头
-    CAMERA_TYPE = "usb"  # 修改为USB摄像头以支持Jetson部署
-    USB_CAMERA_INDEX = 0  # USB摄像头索引
+    # 相机配置 - RealSense D455深度相机已安装并测试正常
+    CAMERA_TYPE = "realsense"  # 使用RealSense深度相机
+    USB_CAMERA_INDEX = 0  # USB摄像头索引 (备用)
     
     # 图像分辨率
     COLOR_WIDTH = 640   # 降低分辨率以提高Jetson性能

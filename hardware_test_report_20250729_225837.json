@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-07-29 22:58:13",
+  "camera_test": {
+    "status": "成功",
+    "details": "RealSense连接正常; "
+  },
+  "robot_test": {
+    "status": "跳过",
+    "details": "无可用串口"
+  },
+  "perception_test": {
+    "status": "失败",
+    "details": "返回码: 1"
+  },
+  "overall_status": "部分成功"
+}

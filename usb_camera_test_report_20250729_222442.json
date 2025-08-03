@@ -1,0 +1,79 @@
+{
+  "timestamp": "20250729_222442",
+  "available_cameras": [
+    {
+      "index": 0,
+      "resolution": [
+        640,
+        480
+      ],
+      "fps": 30.0
+    },
+    {
+      "index": 4,
+      "resolution": [
+        640,
+        480
+      ],
+      "fps": 30.0
+    }
+  ],
+  "primary_camera": 0,
+  "test_results": {
+    "frame_acquisition": {
+      "success_rate": 100.0,
+      "frames_tested": 10,
+      "successful_frames": 10
+    },
+    "image_processing": {
+      "grayscale": {
+        "success": true,
+        "shape": [
+          480,
+          640
+        ],
+        "dtype": "uint8"
+      },
+      "gaussian_blur": {
+        "success": true,
+        "shape": [
+          480,
+          640,
+          3
+        ],
+        "dtype": "uint8"
+      },
+      "edge_detection": {
+        "success": true,
+        "shape": [
+          480,
+          640
+        ],
+        "dtype": "uint8"
+      },
+      "resize": {
+        "success": true,
+        "shape": [
+          240,
+          320,
+          3
+        ],
+        "dtype": "uint8"
+      },
+      "histogram_equalization": {
+        "success": true,
+        "shape": [
+          480,
+          640
+        ],
+        "dtype": "uint8"
+      }
+    },
+    "performance": {
+      "actual_fps": 4.797673320346565,
+      "theoretical_fps": 30.0,
+      "test_duration": 6.253031,
+      "frames_captured": 30
+    }
+  }
+}
