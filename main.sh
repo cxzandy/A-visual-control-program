@@ -283,8 +283,10 @@ full_environment_setup() {
     echo -e "2. 创建Python虚拟环境"
     if [ "$PLATFORM" = "jetson" ]; then
         echo -e "3. 安装 RealSense SDK for Jetson"
+        echo -e "4. 验证安装"
+    else
+        echo -e "3. 验证安装"
     fi
-    echo -e "4. 验证安装"
     echo ""
     
     read -p "是否继续安装? (y/N): " confirm
@@ -325,8 +327,12 @@ full_environment_setup() {
         fi
     fi
     
-    # 步骤4：验证安装
-    echo -e "${YELLOW}步骤4: 验证安装${NC}"
+    # 验证安装
+    if [ "$PLATFORM" = "jetson" ]; then
+        echo -e "${YELLOW}步骤4: 验证安装${NC}"
+    else
+        echo -e "${YELLOW}步骤3: 验证安装${NC}"
+    fi
     conda activate $CONDA_ENV
     python -c "import cv2, numpy, flask; print('✓ 基础模块导入成功')"
     
