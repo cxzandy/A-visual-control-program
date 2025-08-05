@@ -1,0 +1,16 @@
+# Tiaozhanbei2.0 Conda环境配置文件
+# 使用方法: conda env create -f environment.yml
+
+name: tiao
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - numpy>=1.21.0
+  - opencv>=4.8.0
+  - flask>=3.0.0
+  - pip
+  - pip:
+    - pyrealsense2>=2.50.0
+    - pyserial>=3.5.0

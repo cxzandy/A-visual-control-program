@@ -203,14 +203,13 @@ class ControlConfig:
 
 # ========================= 运行模式配置 =========================
 class RunModeConfig:
-    # 运行模式
-    DEMO_MODE = "demo"           # 演示模式
+    # 运行模式 - 移除demo模式
     CALIBRATION_MODE = "calib"   # 标定模式  
     TRACKING_MODE = "track"      # 追踪模式
     TEST_MODE = "test"           # 测试模式
     
-    # 默认运行模式
-    DEFAULT_MODE = DEMO_MODE
+    # 默认运行模式 - 改为追踪模式
+    DEFAULT_MODE = TRACKING_MODE
     
     # 显示设置
     DISPLAY_ENABLED = True       # 是否显示图像

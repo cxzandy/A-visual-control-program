@@ -50,11 +50,11 @@
         }
         
         .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
             background: #f8f9fa;
-            padding: 15px 20px;
+            padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
             border-left: 4px solid #28a745;
@@ -62,16 +62,20 @@
         
         .status-item {
             text-align: center;
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
         }
         
         .status-label {
-            font-size: 0.9em;
+            font-size: 0.8em;
             color: #666;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
         
         .status-value {
-            font-size: 1.2em;
+            font-size: 1.1em;
             font-weight: bold;
             color: #333;
         }
@@ -89,30 +93,40 @@
         
         .mode-buttons {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
         }
         
         .mode-btn {
-            padding: 12px 20px;
-            border: 2px solid #ddd;
+            padding: 16px 20px;
+            border: 2px solid #e9ecef;
             background: white;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9em;
+            transition: all 0.2s ease;
             text-align: center;
+            font-size: 0.9em;
         }
         
         .mode-btn:hover {
             border-color: #667eea;
-            background: #f8f9ff;
+            transform: translateY(-1px);
         }
         
         .mode-btn.active {
             border-color: #667eea;
             background: #667eea;
             color: white;
+        }
+        
+        .mode-btn strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .mode-btn small {
+            font-size: 0.75em;
+            opacity: 0.8;
         }
         
         .control-buttons {
@@ -207,35 +221,113 @@
             opacity: 0.8;
             margin-top: 5px;
         }
+
+        /* 运动方式样式 */
+        .movement-modes {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f1f8ff;
+            border-radius: 10px;
+            border: 2px solid #b8daff;
+        }
+        
+        .movement-modes h4 {
+            margin-bottom: 15px;
+            color: #495057;
+            text-align: center;
+        }
+        
+        .movement-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        
+        .movement-btn {
+            padding: 16px 12px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            font-size: 0.85em;
+        }
+        
+        .movement-btn:hover {
+            border-color: #007bff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+        }
+        
+        .movement-btn.active {
+            border-color: #007bff;
+            background: #007bff;
+            color: white;
+        }
+        
+        .movement-btn strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .movement-btn small {
+            font-size: 0.75em;
+            opacity: 0.8;
+        }
         
         /* 手动控制面板 */
         .manual-controls {
-            margin: 20px 0;
+            margin: 15px 0;
             padding: 20px;
-            background: #f8f9fa;
+            background: #fff3cd;
             border-radius: 10px;
-            border: 2px solid #e9ecef;
+            border: 2px solid #ffeaa7;
         }
-        
+
         .manual-controls h4 {
             margin-bottom: 15px;
             color: #495057;
+            text-align: center;
         }
         
         .direction-buttons {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
         }
         
         .direction-btn {
-            padding: 15px;
-            font-size: 1.1em;
+            padding: 15px 20px;
+            font-size: 1em;
             border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
         
         .direction-btn:active {
             transform: scale(0.95);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .mode-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .movement-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .direction-buttons {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .status-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         
         /* 转向状态显示 */
@@ -284,38 +376,43 @@
         
         .image-display {
             background: white;
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
             text-align: center;
+        }
+        
+        .image-display h3 {
+            margin-bottom: 12px;
+            color: #333;
+            font-size: 1.1em;
         }
         
         .image-container {
             background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            min-height: 400px;
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 300px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px dashed #ddd;
+            border: 1px solid #e9ecef;
         }
         
         .camera-image {
             max-width: 100%;
-            max-height: 500px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-height: 400px;
+            border-radius: 6px;
         }
         
         .no-image {
             color: #666;
-            font-size: 1.1em;
+            font-size: 1em;
         }
         
         .logs {
-            background: #2c3e50;
-            color: #ecf0f1;
+            background: #343a40;
+            color: #f8f9fa;
             padding: 15px;
             border-radius: 8px;
             height: 200px;
@@ -390,28 +487,20 @@
             <!-- 状态栏 -->
             <div class="status-bar">
                 <div class="status-item">
-                    <div class="status-label">系统状态</div>
+                    <div class="status-label">系统</div>
                     <div class="status-value" id="system-status">待机</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">相机状态</div>
+                    <div class="status-label">相机</div>
                     <div class="status-value" id="camera-status">未连接</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">处理FPS</div>
+                    <div class="status-label">FPS</div>
                     <div class="status-value" id="processing-fps">0.0</div>
                 </div>
                 <div class="status-item">
-                    <div class="status-label">检测象限</div>
+                    <div class="status-label">检测</div>
                     <div class="status-value" id="quadrants-detected">0/4</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">预测方向</div>
-                    <div class="status-value" id="prediction-direction">未知</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">预测准确率</div>
-                    <div class="status-value" id="prediction-accuracy">0%</div>
                 </div>
             </div>
             
@@ -443,83 +532,71 @@
             
             <!-- 控制按钮 -->
             <div class="control-buttons">
-                <button class="btn btn-primary" id="start-btn">🚀 启动系统</button>
-                <button class="btn btn-danger" id="stop-btn" disabled>⏹️ 停止系统</button>
+                <button class="btn btn-primary" id="start-btn">🚀 启动</button>
+                <button class="btn btn-danger" id="stop-btn" disabled>⏹️ 停止</button>
             </div>
             
-            <!-- 控制模式选择 -->
+            <!-- 控制模式 -->
             <div class="control-modes">
-                <h4>🎮 控制模式</h4>
-                <div class="mode-selector">
+                <div class="mode-buttons">
                     <button class="btn mode-btn active" data-control-mode="auto">
-                        🤖 自动模式
-                        <small>AI自动检测转向</small>
+                        <strong>🤖 自动模式</strong>
+                        <small>AI智能检测</small>
                     </button>
                     <button class="btn mode-btn" data-control-mode="manual">
-                        🎮 手动模式  
-                        <small>手动控制转向</small>
+                        <strong>🎮 手动模式</strong>
+                        <small>人工控制</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 运动方式选择 -->
+            <div class="movement-modes">
+                <h4>运动方式选择</h4>
+                <div class="movement-buttons">
+                    <button class="btn movement-btn active" data-movement-mode="pipe">
+                        <strong>🚇 管道追踪</strong>
+                        <small>沿管道路径移动</small>
+                    </button>
+                    <button class="btn movement-btn" data-movement-mode="obstacle">
+                        <strong>🛡️ 避障模式</strong>
+                        <small>智能避障导航</small>
+                    </button>
+                    <button class="btn movement-btn" data-movement-mode="flange">
+                        <strong>🔧 法兰检测</strong>
+                        <small>法兰定位识别</small>
                     </button>
                 </div>
             </div>
             
             <!-- 手动控制面板 -->
             <div class="manual-controls hidden" id="manual-controls">
-                <h4>🕹️ 手动控制</h4>
+                <h4>方向控制</h4>
                 <div class="direction-buttons">
-                    <button class="btn btn-warning direction-btn" data-direction="left">
-                        ⬅️ 左转
-                    </button>
-                    <button class="btn btn-success direction-btn" data-direction="straight">
-                        ⬆️ 直行
-                    </button>
-                    <button class="btn btn-warning direction-btn" data-direction="right">
-                        ➡️ 右转
-                    </button>
-                    <button class="btn btn-danger direction-btn" data-direction="stop">
-                        ⏹️ 停止
-                    </button>
+                    <button class="btn btn-warning direction-btn" data-direction="left">⬅️ 左转</button>
+                    <button class="btn btn-success direction-btn" data-direction="straight">⬆️ 直行</button>
+                    <button class="btn btn-warning direction-btn" data-direction="right">➡️ 右转</button>
+                    <button class="btn btn-danger direction-btn" data-direction="stop">⏹️ 停止</button>
                 </div>
             </div>
             
-            <!-- 转向状态显示 -->
-            <div class="turn-status">
-                <h4>🧭 转向状态</h4>
-                <div class="status-grid">
-                    <div class="status-item">
-                        <span class="status-label">当前方向:</span>
-                        <span class="status-value" id="current-direction">直行</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">置信度:</span>
-                        <span class="status-value" id="turn-confidence">0%</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">检测模式:</span>
-                        <span class="status-value" id="detection-mode">自动</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">转向统计:</span>
-                        <span class="status-value" id="turn-stats">左:0 右:0 直:0</span>
-                    </div>
-                </div>
-            </div>
         </div>
         
         <!-- 图像显示 -->
         <div class="image-display">
-            <h3>实时图像显示</h3>
+            <h3>📷 实时画面</h3>
             <div class="image-container">
                 <img id="camera-image" class="camera-image hidden" alt="相机图像">
                 <div id="no-image" class="no-image">
-                    📷 等待图像数据...<br>
-                    <small>启动系统后将显示实时的四象限管道检测结果</small>
+                    等待图像数据...<br>
+                    <small>启动系统后显示检测结果</small>
                 </div>
             </div>
             
-            <!-- 日志显示 -->
+            <!-- 简化日志 -->
             <div class="logs" id="logs">
                 <div class="log-entry">
-                    <span class="log-timestamp">[系统]</span> Web控制台已启动，等待用户操作...
+                    <span class="log-timestamp">[系统]</span> 控制台就绪
                 </div>
             </div>
         </div>
@@ -527,8 +604,9 @@
 
     <script>
         // 全局变量
-        let currentMode = 'demo';
+        let currentMode = 'track';  // 默认追踪模式，移除demo
         let controlMode = 'auto';  // 控制模式：auto/manual
+        let movementMode = 'pipe'; // 运动方式：pipe/obstacle/flange
         let isRunning = false;
         let updateInterval = null;
         
@@ -537,6 +615,7 @@
         const stopBtn = document.getElementById('stop-btn');
         const modeButtons = document.querySelectorAll('.mode-btn');
         const controlModeButtons = document.querySelectorAll('[data-control-mode]');
+        const movementModeButtons = document.querySelectorAll('[data-movement-mode]');
         const directionButtons = document.querySelectorAll('.direction-btn');
         const manualControls = document.getElementById('manual-controls');
         const cameraImage = document.getElementById('camera-image');
@@ -587,7 +666,27 @@
                     }
                     
                     // 发送控制模式到后端
-                    setControlMode(controlMode);
+                    setControlMode(controlMode, movementMode);
+                });
+            });
+
+            // 运动方式选择
+            movementModeButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    movementModeButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    movementMode = this.dataset.movementMode;
+                    
+                    let modeNames = {
+                        'pipe': '管道追踪模式',
+                        'obstacle': '避障导航模式', 
+                        'flange': '法兰检测模式'
+                    };
+                    
+                    addLog(`切换到${modeNames[movementMode]}`);
+                    
+                    // 发送运动方式到后端
+                    setControlMode(controlMode, movementMode);
                 });
             });
             
@@ -687,24 +786,37 @@
         }
         
         // 设置控制模式
-        async function setControlMode(mode) {
+        // 设置控制模式和运动方式
+        async function setControlMode(controlMode, movementMode = 'pipe') {
             try {
                 const response = await fetch('/api/control_mode', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ mode: mode })
+                    body: JSON.stringify({ 
+                        control_mode: controlMode,
+                        movement_mode: movementMode
+                    })
                 });
                 
                 const result = await response.json();
                 if (result.success) {
-                    addLog(`控制模式已设置为: ${mode}`);
+                    let modeNames = {
+                        'auto': '自动模式',
+                        'manual': '手动模式'
+                    };
+                    let movementNames = {
+                        'pipe': '管道追踪',
+                        'obstacle': '避障导航',
+                        'flange': '法兰检测'
+                    };
+                    addLog(`模式设置: ${modeNames[controlMode]} + ${movementNames[movementMode]}`);
                 } else {
-                    addLog(`设置控制模式失败: ${result.message}`);
+                    addLog(`设置模式失败: ${result.message}`);
                 }
             } catch (error) {
-                addLog(`设置控制模式错误: ${error.message}`);
+                addLog(`设置模式错误: ${error.message}`);
             }
         }
         

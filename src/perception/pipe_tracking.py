@@ -12,39 +12,97 @@ except ImportError:
     class RunModeConfig:
         VERBOSE_OUTPUT = False
 
-# 导入方向预测器
-try:
-    from pipe_direction_predictor import PipeDirectionPredictor
-    from partial_pipe_tracker import PartialPipeTracker
-except ImportError:
-    try:
-        from .pipe_direction_predictor import PipeDirectionPredictor
-        from .partial_pipe_tracker import PartialPipeTracker
-    except ImportError:
-        # 如果无法导入，创建一个空的预测器类
-        class PipeDirectionPredictor:
-            def __init__(self, *args, **kwargs):
-                pass
-            def add_frame_data(self, *args, **kwargs):
-                pass
-            def predict_direction(self, *args, **kwargs):
-                return None
+# 内置方向预测和部分追踪功能
+
+class PipeDirectionPredictor:
+    """内置方向预测器"""
+    def __init__(self, history_size=15, prediction_steps=8):
+        self.history_size = history_size
+        self.prediction_steps = prediction_steps
+        self.history = []
         
-        class PartialPipeTracker:
-            def __init__(self, *args, **kwargs):
-                pass
-            def track_partial_pipe(self, *args, **kwargs):
-                return None
-        def predict_direction(self):
-            return {'direction': 'unknown', 'confidence': 0.0}
-        def get_direction_visualization(self, image):
-            return image
+    def add_frame_data(self, center_point, direction_vector, timestamp=None):
+        """添加帧数据"""
+        if len(self.history) >= self.history_size:
+            self.history.pop(0)
+        self.history.append({
+            'center': center_point,
+            'direction': direction_vector,
+            'timestamp': timestamp or time.time()
+        })
     
-    class PartialPipeTracker:
-        def __init__(self, *args, **kwargs):
-            pass
-        def track_partial_pipe(self, *args, **kwargs):
-            return {'success': False}
+    def predict_direction(self):
+        """预测方向"""
+        if len(self.history) < 3:
+            return {'direction': 'unknown', 'confidence': 0.0}
+        
+        # 简单的方向预测基于历史数据
+        recent_directions = [frame['direction'] for frame in self.history[-3:]]
+        
+        # 计算平均方向
+        if recent_directions:
+            avg_direction = np.mean(recent_directions, axis=0)
+            
+            # 判断左转还是右转
+            if avg_direction[0] > 10:  # 向右
+                direction = 'right'
+                confidence = min(abs(avg_direction[0]) / 50.0, 1.0)
+            elif avg_direction[0] < -10:  # 向左
+                direction = 'left'
+                confidence = min(abs(avg_direction[0]) / 50.0, 1.0)
+            else:
+                direction = 'straight'
+                confidence = 0.7
+            
+            return {'direction': direction, 'confidence': confidence}
+        
+        return {'direction': 'unknown', 'confidence': 0.0}
+    
+    def get_direction_visualization(self, image):
+        """获取方向可视化"""
+        return image
+
+class PartialPipeTracker:
+    """内置部分管道追踪器"""
+    def __init__(self):
+        self.last_center = None
+        
+    def track_partial_pipe(self, color_image, depth_image=None):
+        """追踪部分可见管道"""
+        # 简化的部分追踪实现
+        gray = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+        
+        # 查找轮廓
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if contours:
+            # 找到最大轮廓
+            largest_contour = max(contours, key=cv2.contourArea)
+            
+            # 计算轮廓中心
+            M = cv2.moments(largest_contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                
+                return {
+                    'success': True,
+                    'pipe_edges': [largest_contour],
+                    'estimated_center': (cx, cy),
+                    'pipe_direction': 0,
+                    'tracking_method': 'contour',
+                    'confidence': 0.6
+                }
+        
+        return {'success': False}
+    
+    def visualize_result(self, image, result):
+        """可视化结果"""
+        if result.get('success', False) and result.get('estimated_center'):
+            cx, cy = result['estimated_center']
+            cv2.circle(image, (cx, cy), 5, (0, 255, 0), -1)
+        return image
 
 class PipeTracker:
     """管道追踪器 - 增强版本支持方向预测"""
@@ -323,7 +381,7 @@ class PipeTracker:
                     # 更新方向预测器
                     self.direction_predictor.add_frame_data(
                         center_point=tuple(center_point),
-                        angle=angle,
+                        direction_vector=[angle, 0],  # 转换为方向向量
                         timestamp=time.time()
                     )
                     
@@ -624,7 +682,7 @@ class PipeTracker:
                 # 更新方向预测器
                 self.direction_predictor.add_frame_data(
                     center_point=tuple(center_point),
-                    angle=angle,
+                    direction_vector=[angle, 0],  # 转换为方向向量
                     timestamp=time.time()
                 )
                 
@@ -656,7 +714,7 @@ class PipeTracker:
                 # 更新方向预测器
                 self.direction_predictor.add_frame_data(
                     center_point=center_point,
-                    angle=angle,
+                    direction_vector=[angle, 0],  # 转换为方向向量
                     timestamp=time.time()
                 )
                 

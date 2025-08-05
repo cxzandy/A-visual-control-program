@@ -1,53 +1,77 @@
-# This file may be used to create an environment using:
-# $ conda create --name <env> --file <this file>
-# platform: linux-64
-# created-by: conda 24.9.2
-_libgcc_mutex=0.1=main
-_openmp_mutex=5.1=1_gnu
-addict=2.4.0=pypi_0
-asttokens=3.0.0=pypi_0
-attrs=25.3.0=pypi_0
-backcall=0.2.0=pypi_0
-blas=1.0=mkl
-blinker=1.8.2=pypi_0
-bzip2=1.0.8=h5eee18b_6
-c-ares=1.19.1=h5eee18b_0
-ca-certificates=2025.2.25=h06a4308_0
-cairo=1.16.0=he5ede1b_6
-certifi=2025.6.15=pypi_0
-charset-normalizer=3.4.2=pypi_0
-click=8.1.8=pypi_0
-comm=0.2.2=pypi_0
-configargparse=1.7.1=pypi_0
-contourpy=1.1.1=pypi_0
-cycler=0.12.1=pypi_0
-cyrus-sasl=2.1.28=h52b45da_1
-dash=3.1.1=pypi_0
-dbus=1.13.18=hb2f20db_0
-decorator=5.2.1=pypi_0
-eigen=3.4.0=hdb19cb5_0
-executing=2.2.0=pypi_0
-expat=2.7.1=h6a678d5_0
-fastjsonschema=2.21.1=pypi_0
-ffmpeg=4.2.2=h20bf706_0
-flask=3.0.3=pypi_0
-fontconfig=2.14.1=h55d465d_3
-fonttools=4.57.0=pypi_0
-freetype=2.13.3=h4a9f257_0
-glib=2.78.4=h6a678d5_0
-glib-tools=2.78.4=h6a678d5_0
-gmp=6.3.0=h6a678d5_0
-gnutls=3.6.15=he1e5248_0
-graphite2=1.3.14=h295c915_1
-gst-plugins-base=1.14.1=h6a678d5_1
-gstreamer=1.14.1=h5eee18b_1
-harfbuzz=4.3.0=hf52aaf7_2
-hdf5=1.12.1=h2b7332f_3
-icu=73.1=h6a678d5_0
-idna=3.10=pypi_0
-importlib-metadata=8.5.0=pypi_0
-importlib-resources=6.4.5=pypi_0
-intel-openmp=2023.1.0=hdb19cb5_46306
+# Tiaozhanbei2.0 智能管道追踪系统
+# 基于 Intel RealSense 深度相机的管道追踪与法兰检测系统
+# Python 3.8+ 兼容
+
+# ================================ 核心依赖 ================================
+
+# 计算机视觉处理
+opencv-python>=4.8.0,<5.0.0
+numpy>=1.21.0,<2.0.0
+
+# RealSense 深度相机支持
+pyrealsense2>=2.50.0
+
+# 串口通信 (与 DJI RoboMaster C板通信)
+pyserial>=3.5.0,<4.0.0
+
+# Web界面框架
+Flask>=3.0.0,<4.0.0
+
+# ================================ 系统依赖 ================================
+
+# 这些库通常是Python标准库的一部分，但列出以确保兼容性:
+# - argparse (Python 3.2+ 内置)
+# - logging (内置) 
+# - datetime (内置)
+# - threading (内置)
+# - json (内置)
+# - base64 (内置)
+# - subprocess (内置)
+# - os (内置) 
+# - sys (内置)
+# - time (内置)
+# - signal (内置)
+# - traceback (内置)
+# - typing (Python 3.5+ 内置)
+
+# ================================ 可选依赖 ================================
+
+# 点云处理 (高级功能，按需安装)
+# open3d>=0.17.0
+
+# 深度学习推理 (AI增强功能，按需安装)  
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# 科学计算 (高级数学运算，按需安装)
+# scipy>=1.9.0
+
+# ================================ 开发依赖 ================================
+
+# 测试框架 (开发环境)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+
+# 代码格式化 (开发环境)
+# black>=23.0.0
+# flake8>=6.0.0
+
+# ================================ 平台说明 ================================
+
+# 支持的操作系统:
+# - Ubuntu 18.04+ / Debian 10+
+# - Windows 10+ 
+# - macOS 10.15+
+
+# 硬件要求:
+# - Intel RealSense D455 深度相机
+# - USB 3.0 接口
+# - 4GB+ RAM (推荐 8GB+)
+
+# 注意事项:
+# 1. pyrealsense2 需要先安装 Intel RealSense SDK
+# 2. 某些Linux发行版可能需要额外的系统包
+# 3. Jetson设备请使用特定的OpenCV版本
 ipython=8.12.3=pypi_0
 ipywidgets=8.1.7=pypi_0
 itsdangerous=2.2.0=pypi_0

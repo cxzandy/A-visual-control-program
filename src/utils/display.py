@@ -103,8 +103,8 @@ def add_fps_overlay(image, fps: float, position: tuple = (10, 30)):
         添加FPS显示的图像
     """
     try:
-        fps_text = f"FPS: {fps:.1f}"
-        return add_text_overlay(image, fps_text, position, color=(0, 255, 255))
+        fps_text = f"{fps:.1f}fps"
+        return add_text_overlay(image, fps_text, position, color=(0, 255, 0), font_scale=0.6)
     except Exception as e:
         print(f"添加FPS显示失败: {e}")
         return image
@@ -127,8 +127,10 @@ def add_status_overlay(image, status_dict: dict, start_y: int = 30):
         
         for key, value in status_dict.items():
             text = f"{key}: {value}"
-            result_image = add_text_overlay(result_image, text, (10, y_offset))
-            y_offset += 25
+            color = (0, 255, 0) if value == "OK" else (0, 0, 255)  # 绿色OK，红色ERROR
+            result_image = add_text_overlay(result_image, text, (10, y_offset), 
+                                          font_scale=0.5, color=color)
+            y_offset += 20
             
         return result_image
     except Exception as e:

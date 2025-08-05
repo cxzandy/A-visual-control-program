@@ -1,608 +1,588 @@
-# Tiaozhanbei2.0 - 智能管道追踪与法兰识别系统
+# Tiaozhanbei2.0 - Intelligent Pipe Tracking System
 
-<div align="center">
+## 📋 Project Overview
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.5+-green.svg)
-![RealSense](https://img.shields.io/badge/Intel-RealSense-lightblue.svg)
-![Flask](https://img.shields.io/badge/Flask-Web-orange.svg)
-![AI](https://img.shields.io/badge/AI-Direction_Prediction-purple.svg)
-![Status](https://img.shields.io/badge/Status-v2.1.0-brightgreen.svg)
+Tiaozhanbei2.0 is an intelligent pipe tracking system based on Intel RealSense depth camera, specifically designed for industrial pipe inspection robots. The system integrates computer vision, deep learning, and web control interface, providing real-time pipe tracking, obstacle detection, and intelligent steering control capabilities.
 
-**基于AI的智能管道追踪系统 - 支持方向预测与远程监控**
+## � Quick Start
 
-[新特性](#-v210-新特性) • [快速开始](#-快速开始) • [方向预测](#-方向预测系统) • [远程监控](#-远程监控)
+### 1. System Requirements
+- **Python**: 3.8 or higher
+- **Operating System**: Ubuntu 18.04+ / Windows 10+ / macOS 10.15+
+- **Hardware**: Intel RealSense D455 depth camera (required)
+- **Memory**: 8GB+ recommended
+- **GPU**: NVIDIA GPU with CUDA support (optional, for acceleration)
 
-</div>
+### 2. RealSense Driver Installation
 
----
-
-## 🆕 v2.1.0 新特性
-
-### 🎯 智能方向预测系统
-- **AI驱动预测**: 基于历史轨迹数据预测管道转向方向
-- **实时分析**: 支持左转、右转、上升、下降四个方向的预测
-- **置信度评估**: 提供预测准确率和置信度评分
-- **自适应学习**: 根据历史数据动态优化预测模型
-
-### 📊 增强的Web界面
-- **预测可视化**: 实时显示方向预测箭头和置信度
-- **统计面板**: 新增预测准确率和方向统计信息
-- **状态监控**: 完整的系统运行状态和性能指标
-
-### 🚀 远程监控支持
-- **80公里远程访问**: 支持ngrok、frp、WiFi热点多种方案
-- **云端部署**: 完整的远程部署和访问配置
-- **实时数据传输**: 优化的网络传输和延迟控制
-
----
-
-## 📋 项目概述
-
-Tiaozhanbei2.0是一个专为工业管道机器人设计的智能计算机视觉系统，具备：
-- **四象限管道检测** - 高精度管道追踪和轴线拟合
-- **AI方向预测** - 基于机器学习的管道转向预测
-- **实时深度感知** - 基于Intel RealSense D455的3D视觉
-- **Web控制界面** - 现代化Web界面，支持实时监控和参数调节
-- **远程监控** - 支持80公里远程访问和控制
-- **机器人通信** - 支持DJI RoboMaster C板串口通信
-
----
-
-## 🎯 方向预测系统
-
-### 核心特性
-- **历史轨迹分析**: 记录管道中心点的移动轨迹
-- **方向分类**: 支持左转、右转、上升、下降四个方向
-- **置信度评估**: 基于移动距离和角度计算预测置信度
-- **实时可视化**: Web界面显示预测箭头和统计信息
-
-### 预测算法
-```python
-# 方向预测核心算法
-class PipeDirectionPredictor:
-    def predict_direction(self):
-        # 1. 分析历史轨迹点
-        # 2. 计算移动向量和角度
-        # 3. 分类方向并评估置信度
-        # 4. 返回预测结果
-```
-
-### 使用示例
-```python
-# 集成在管道追踪器中
-pipe_tracker = PipeTracker()
-line_params, global_axis, vis_image, prediction_info = pipe_tracker.track(color_frame, depth_frame)
-
-# 预测信息包含：
-# - direction: 'left', 'right', 'up', 'down', 'straight'
-# - confidence: 0.0 - 1.0
-# - turn_angle: 转向角度
-```
-
----
-
-## 🚀 远程监控
-
-### 多种远程访问方案
-
-#### 1. ngrok隧道（推荐）
+#### Ubuntu/Linux System
 ```bash
-# 安装ngrok
-wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-tar -xzf ngrok-v3-stable-linux-amd64.tgz
-
-# 启动Web服务
-python web/web_simple.py
-
-# 在另一个终端启动ngrok
-./ngrok http 5000
-
-# 获得公网URL: https://xxxx.ngrok.io
+# Install RealSense SDK
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE
+sudo add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" -u
+sudo apt-get update
+sudo apt-get install librealsense2-dkms librealsense2-utils librealsense2-dev
 ```
 
-#### 2. frp内网穿透
-```bash
-# 配置frp客户端
-echo "
-[common]
-server_addr = your-server.com
-server_port = 7000
-[web]
-type = http
-local_port = 5000
-custom_domains = your-domain.com
-" > frpc.ini
+#### Windows System
+1. Download RealSense SDK 2.0 from [Intel Official Website](https://www.intelrealsense.com/sdk-2/)
+2. Run the installer and complete installation
+3. Connect RealSense camera and verify device
 
-# 启动客户端
-./frpc -c frpc.ini
+#### macOS System
+```bash
+# Install using brew
+brew install librealsense
 ```
 
-#### 3. WiFi热点共享
+### 3. Project Environment Setup
 ```bash
-# Ubuntu系统创建热点
-nmcli dev wifi hotspot ifname wlan0 ssid "RobotControl" password "12345678"
-
-# 获取热点IP
-ip addr show wlan0
-```
-
----
-
-## 🚀 快速开始
-
-### 1. 环境安装
-
-```bash
-# 克隆项目
+# Clone project
 git clone https://github.com/cxzandy/A-visual-control-program.git
 cd A-visual-control-program
 
-# 创建conda环境
-conda create -n tiao python=3.8
-conda activate tiao
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or venv\Scripts\activate  # Windows
 
-# 安装依赖
+# Install Python dependencies
+pip install -r requirements_pip.txt
+```
+
+### 4. System Verification
+```bash
+# Verify RealSense camera connection
+python -c "import pyrealsense2 as rs; print('RealSense SDK installed')"
+
+# Run system demo
+python -m src.main --mode demo --display
+```
+
+---
+
+## 🔧 Hardware Requirements
+
+### 🎥 Required Hardware
+
+#### Intel RealSense D455 Depth Camera
+- **Purpose**: Primary visual sensor providing RGB images and depth data
+- **Specifications**:
+  - Depth Technology: Stereo Vision
+  - Depth Resolution: Up to 1280×720 @ 30fps
+  - RGB Resolution: Up to 1920×1080 @ 30fps
+  - Measurement Range: 0.2m - 10m
+  - Field of View: 87° × 58° (depth)
+
+#### DJI RoboMaster C-board
+- **Purpose**: Robot main control board receiving visual system navigation commands
+- **Interface Requirements**:
+  - UART serial communication
+  - Baud rate: 115200
+  - Data bits: 8, Stop bits: 1, No parity
+- **Connection**:
+  - USB to TTL serial module connected to PC
+  - Or directly use development board USB virtual serial port
+
+### 💻 Computing Platform Requirements
+
+#### Minimum Configuration
+- **CPU**: Intel i5-8th gen or AMD Ryzen 5 3600+
+- **RAM**: 8GB (16GB recommended)
+- **Storage**: 50GB available space
+- **OS**: Windows 10/11, Ubuntu 18.04+, macOS 10.15+
+
+#### Recommended Configuration
+- **CPU**: Intel i7-10th gen or AMD Ryzen 7 4000 series
+- **GPU**: NVIDIA GTX 1660 or higher (optional, for acceleration)
+- **RAM**: 16GB
+- **USB**: USB 3.0 interface (for RealSense connection)
+
+---
+
+## 🚀 Quick Start
+
+### 1️⃣ Environment Setup
+
+#### Install Python Environment (Python 3.8+ recommended)
+```bash
+# Windows users recommend using Anaconda
+conda create -n tiaozhanbei python=3.8
+conda activate tiaozhanbei
+
+# Or use system Python
+python -m venv tiaozhanbei_env
+# Windows
+tiaozhanbei_env\Scripts\activate
+# Linux/Mac
+source tiaozhanbei_env/bin/activate
+```
+
+#### Install Dependencies
+```bash
+# Core dependencies
+pip install pyrealsense2 opencv-python numpy pyserial
+
+# Complete dependencies (recommended)
 pip install -r requirements.txt
 ```
 
-### 2. 硬件连接
+### 2️⃣ Hardware Connection
 
-- 连接Intel RealSense D455相机到USB 3.0端口
-- 连接DJI C板到串口（可选，/dev/ttyUSB0）
+#### RealSense Camera Connection
+1. Connect RealSense D455 to computer via USB 3.0
+2. Run Intel RealSense Viewer to verify connection:
+   ```bash
+   realsense-viewer
+   ```
+3. Confirm you can see depth and color image streams
 
-### 3. 运行测试
+#### Robot Communication Connection (Optional)
+1. Connect USB to TTL module to computer
+2. Connect TTL module TX, RX, GND to DJI C-board corresponding pins
+3. Confirm serial port number in Device Manager (e.g., COM3)
 
+### 3️⃣ Project Setup
+
+#### Clone Project
 ```bash
-# 激活环境
-conda activate tiao
-
-# 验证系统配置
-python -m src.main --config-check
-
-# 运行演示模式
-python -m src.main --mode demo
+git clone https://github.com/cxzandy/A-vision-project-for-pipe-tracking-and-flange-recognition-available-for-DJI-c-board-communication.git
+cd A-vision-project-for-pipe-tracking-and-flange-recognition-available-for-DJI-c-board-communication
 ```
 
-### 4. Web界面快速体验
-
+#### Verify Installation
 ```bash
-# 启动Web界面
-./start_web.sh
+# Run environment check
+python src/main.py --config-check
 
-# 浏览器访问
-# http://localhost:5000
+# Run complete demo script (Windows PowerShell)
+.\scripts\run_demo.ps1
+
+# Run complete demo script (Windows CMD)
+scripts\run_demo.bat
+
+# Run complete demo script (Linux/Mac/WSL)
+bash scripts/run_demo.sh
+```
+
+### 4️⃣ First Run
+
+#### Quick Demo Mode
+```bash
+# Basic demo (no hardware required)
+python src/main.py --mode demo
+
+# Demo with image display
+python src/main.py --mode demo --display
+
+# Verbose output mode
+python src/main.py --mode demo --display --verbose
 ```
 
 ---
 
-## 🌐 Web控制界面
+## 📖 Usage Guide
 
-### 启动Web服务
+### Command Line Mode
 
+#### Basic Commands
 ```bash
-# 方式1：使用启动脚本
-./start_web.sh
-
-# 方式2：直接运行
-conda run -n tiao python web/web_simple.py
-
-# 方式3：演示模式（自动打开浏览器）
-./demo_web.sh
-```
-
-### Web界面功能
-
-- 📊 **实时监控** - 查看系统状态和参数
-- 🎛️ **参数调节** - 在线调整检测阈值
-- 📸 **图像预览** - 实时查看处理结果
-- 🔄 **模式切换** - 快速切换不同工作模式
-- 📝 **日志查看** - 实时查看系统日志
-
-详细说明请参考：[Web界面使用指南](web/WEB_GUIDE.md)
-
----
-
-## 📁 项目结构
-
-```
-A-visual-control-program/
-├── 🎯 核心系统
-│   ├── src/                    # 源代码目录
-│   │   ├── main.py            # 主程序入口
-│   │   ├── config.py          # 系统配置
-│   │   ├── camera/            # 相机模块
-│   │   ├── perception/        # 感知模块（管道检测）
-│   │   ├── robot/             # 机器人通信
-│   │   └── utils/             # 工具模块
-│   │
-├── 🌐 Web控制界面
-│   ├── web/                   # Web界面目录
-│   │   ├── web_simple.py      # Flask服务器
-│   │   ├── templates/         # HTML模板
-│   │   └── README.md          # Web使用说明
-│   ├── start_web.sh          # Web启动脚本
-│   └── demo_web.sh           # Web演示脚本
-│   │
-├── 🧪 测试和脚本
-│   ├── tests/                 # 单元测试
-│   │   └── test_quadrant_detection.py  # 四象限检测测试
-│   └── scripts/               # 运行脚本
-│   │
-├── 📊 数据和输出
-│   ├── data/calib/           # 标定数据
-│   └── output/               # 输出目录
-│       ├── images/           # 保存的图像
-│       └── logs/             # 日志文件
-│   │
-└── 📚 文档
-    ├── README.md             # 项目说明（本文件）
-    ├── docs/                 # 详细文档
-    └── requirements.txt      # Python依赖
-```
-
----
-
-## 🎮 命令行使用
-
-### 基本语法
-
-```bash
-conda run -n tiao python -m src.main [OPTIONS]
-```
-
-### 运行模式
-
-#### 1. 演示模式 (推荐新手使用)
-```bash
-# 基本演示
-python -m src.main --mode demo
-
-# 演示模式 + 图像显示
+# Demo mode (quick functionality verification)
 python -m src.main --mode demo --display
 
-# 演示模式 + 结果保存
-python -m src.main --mode demo --display --save
-```
-
-#### 2. 实时追踪模式
-```bash
-# 实时管道追踪
+# Real-time tracking mode (continuous pipe detection)
 python -m src.main --mode track --display
 
-# 追踪 + 保存结果
-python -m src.main --mode track --display --save
-
-# 追踪 + 详细输出
-python -m src.main --mode track --display --verbose
-```
-
-#### 3. 相机标定模式
-```bash
-# 相机标定
-python -m src.main --mode calib --display
-
-# 标定 + 保存标定文件
+# Camera calibration mode (generate calibration parameters)
 python -m src.main --mode calib --display --save
-```
 
-#### 4. 系统测试模式
-```bash
-# 完整系统测试
-python -m src.main --mode test --verbose
-
-# 测试 + 显示结果
+# System test mode (comprehensive functionality test)
 python -m src.main --mode test --display --verbose
 ```
 
-### 命令行参数详解
+#### Parameter Description
+- `--mode`: Running mode (demo/track/calib/test)
+- `--display`: Show real-time image window
+- `--save`: Save processing results to files
+- `--verbose`: Show detailed debug information
+- `--config-check`: Verify system configuration
 
-| 参数 | 简写 | 说明 | 示例 |
-|------|------|------|------|
-| `--mode` | `-m` | 运行模式 | `--mode track` |
-| `--display` | `-d` | 启用图像显示 | `--display` |
-| `--save` | `-s` | 保存处理结果 | `--save` |
-| `--verbose` | `-v` | 详细输出日志 | `--verbose` |
-| `--config-check` | `-c` | 仅检查配置 | `--config-check` |
+### Web Interface Mode
 
-### 常用命令组合
-
+#### Start Web Service
 ```bash
-# 🔍 快速功能验证
-python -m src.main --mode demo
-
-# 🎯 实时追踪 + 可视化
-python -m src.main --mode track --display
-
-# 🐛 调试模式
-python -m src.main --mode track --display --verbose
-
-# 📸 相机标定
-python -m src.main --mode calib --display --save
-
-# ✅ 系统全面测试
-python -m src.main --mode test --display --verbose --save
-
-# 🔧 配置检查
-python -m src.main --config-check
-```
-
-### 快速测试脚本
-
-```bash
-# 测试四象限管道检测
-python tests/test_quadrant_detection.py
-
-# 运行所有测试
-python -m pytest tests/ -v
-```
-
-### 🌐 Web控制界面
-
-除了命令行操作，系统还提供了友好的Web控制界面：
-
-#### 启动Web界面
-
-```bash
-# 方法1：使用启动脚本 (推荐)
+# Using startup script (recommended)
 ./start_web.sh
 
-# 方法2：使用演示脚本
+# Demo mode (automatically opens browser)
 ./demo_web.sh
 
-# 方法3：直接运行
-conda run -n tiao python web/web_simple.py
+# Direct Python execution
+python web/web_simple.py
+
+# Check environment only
+./start_web.sh --check
 ```
 
-#### Web界面功能
+#### Web Interface Features
+- **Real-time Monitoring**: View camera feed and system status
+- **Mode Switching**: Quick switching between Demo/Track/Calib/Test modes
+- **Manual Control**: Manual robot movement control
+- **Status Display**: Real-time display of processing FPS, connection status, etc.
+- **Log Viewing**: View system operation logs and error information
 
-- **🎮 图形化控制** - 点击按钮启动/停止系统
-- **📊 实时状态监控** - 显示FPS、检测结果等统计信息
-- **📱 响应式设计** - 支持手机、平板访问
-- **🖼️ 图像显示** - 实时显示四象限管道检测结果
-- **📝 日志记录** - 实时显示系统运行日志
-
-#### 访问地址
-
-- **本地访问**: http://localhost:5000
-- **局域网访问**: http://[您的IP地址]:5000
-
-#### Web界面操作
-
-1. **选择运行模式** - 演示、追踪、标定、测试
-2. **启动系统** - 点击"🚀 启动系统"按钮
-3. **查看状态** - 监控相机状态、FPS、检测结果
-4. **观看图像** - 实时查看管道检测可视化
-5. **停止系统** - 点击"⏹️ 停止系统"按钮
+Access Address: `http://localhost:5000`
 
 ---
 
-## 🛠 硬件配置
+## ⚙️ System Configuration
 
-### 必需硬件
+### Main Configuration Files
+System configuration is located in `src/config.py`, including the following main settings:
 
-#### Intel RealSense D455 深度相机
-- **连接**: USB 3.0接口
-- **分辨率**: 640x480 @ 30fps (系统自动适配)
-- **深度范围**: 0.2m - 10m
+#### Camera Configuration
+```python
+# Camera resolution and frame rate
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
+CAMERA_FPS = 30
 
-#### DJI RoboMaster C板 (可选)
-- **连接**: 串口 /dev/ttyUSB0
-- **波特率**: 115200
-- **通信协议**: UART
+# Depth range settings
+DEPTH_MIN = 0.1  # Minimum depth (meters)
+DEPTH_MAX = 10.0  # Maximum depth (meters)
+```
 
-### 系统要求
+#### Detection Parameters
+```python
+# Pipe detection thresholds
+PIPE_DEPTH_THRESHOLD = 2.0  # Pipe depth threshold (meters)
+OBSTACLE_DEPTH_THRESHOLD = 1.0  # Obstacle depth threshold (meters)
 
-- **操作系统**: Ubuntu 18.04+, Windows 10+, macOS 10.15+
-- **Python**: 3.8 或更高版本
-- **内存**: 最少8GB RAM (推荐16GB)
-- **USB**: USB 3.0接口 (用于RealSense连接)
+# Image processing parameters
+EDGE_THRESHOLD_LOW = 50   # Edge detection low threshold
+EDGE_THRESHOLD_HIGH = 150 # Edge detection high threshold
+```
+
+#### Robot Communication Configuration
+```python
+# Serial port settings
+SERIAL_PORT = "/dev/ttyUSB0"  # Linux
+# SERIAL_PORT = "COM3"        # Windows
+BAUD_RATE = 115200
+TIMEOUT = 1.0
+
+# Enable/disable robot control
+ROBOT_ENABLED = False  # Set to True to enable robot control
+```
 
 ---
 
-## 📊 系统状态说明
+## 🔧 Troubleshooting
 
-### 启动时状态检查
+### Common Issues and Solutions
 
-```
-验证系统配置...
-✅ 配置验证通过
-
-🚀 启动 Tiaozhanbei2.0 系统 - 模式: demo
-正在初始化硬件组件...
-正在尝试连接到RealSense相机...
-成功连接到RealSense相机。
-RealSense相机已启动: 640x480 @ 30fps
-✅ 相机连接成功
-串口连接错误: [Errno 2] No such file or directory: '/dev/ttyUSB0'
-⚠️  机器人通信连接失败 (串口不存在是正常的)
-✅ 系统初始化完成
-```
-
-### 运行时状态显示
-
-```
-==================================================
-Tiaozhanbei2.0 系统状态
-==================================================
-相机连接: ✓
-机器人连接: ✗ (可选)
-标定加载: ✗ (首次运行为空)
-处理帧数: 152
-处理FPS: 28.50
-错误计数: 0
-==================================================
-```
-
-### 可视化窗口内容
-
-运行 `--display` 参数时会显示：
-
-- **四象限检测结果** - 不同颜色显示各象限管道线条
-- **管道轴线拟合** - 黄色线条显示拟合的管道中心线
-- **象限分割线** - 白色线条分割四个检测区域
-- **检测状态信息** - 显示检测到的象限数量和FPS
-- **实时统计** - 帧数、处理速度等信息
-
----
-
-## 🔧 故障排除
-
-### 常见问题
-
-#### 1. ImportError: cannot import name 'PointCloudGenerator'
+#### 1. RealSense Camera Issues
+**Issue**: `pyrealsense2` import failed
 ```bash
-# 原因：缺少点云生成器类
-# 解决：系统已修复，重新运行即可
-python -m src.main --mode demo
+# Solution: Reinstall RealSense SDK
+sudo apt-get install --reinstall librealsense2-utils librealsense2-dev
+pip install --upgrade pyrealsense2
 ```
 
-#### 2. 相机连接失败
+**Issue**: Camera connection failed
 ```bash
-# 检查USB连接
+# Check device connection
 lsusb | grep Intel
-# 应显示: Bus xxx Device xxx: Intel Corp. RealSense Camera
-
-# 重新插拔USB连接
-# 或尝试其他USB 3.0端口
+realsense-viewer  # Official test tool
 ```
 
-#### 3. 深度值验证失败
+#### 2. Python Environment Issues
+**Issue**: Module import error
 ```bash
-# 错误：depth_scale 超出有效范围
-# 原因：配置范围过严
-# 解决：系统已修复深度值验证范围
+# Ensure running from project root directory
+cd A-visual-control-program
+python -m src.main  # Use module method to run
+
+# Check Python path
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 ```
 
-#### 4. FPS显示为0.0
+#### 3. Permission Issues
+**Issue**: Serial port access denied
 ```bash
-# 原因：FPS计算逻辑错误
-# 解决：系统已修复FPS计算
-# 正常FPS应在20-30之间
+# Add user to serial port group
+sudo usermod -a -G dialout $USER
+# Logout and login again to take effect
 ```
 
-#### 5. 窗口标题显示乱码
+#### 4. Web Interface Issues
+**Issue**: Cannot access web interface
 ```bash
-# 原因：中文标题在某些系统显示为"????"
-# 解决：系统已改为英文标题
+# Check port occupation
+sudo netstat -tulpn | grep :5000
+
+# Use different port
+python web/web_simple.py --port 8080
 ```
 
-#### 6. 串口连接失败 (可忽略)
+### Debugging Tools
+
+#### System Diagnostics
 ```bash
-# 错误：/dev/ttyUSB0: No such file or directory
-# 说明：机器人通信为可选功能，不影响视觉系统运行
-# 如需连接：请确保DJI C板正确连接到USB串口
+# Check system configuration
+python -m src.main --config-check
+
+# Hardware connection test
+python tests/test_camera.py
+python tests/test_robot.py
 ```
 
-### 系统依赖检查
-
+#### Log Viewing
 ```bash
-# 检查Python版本
-python --version  # 应为3.8+
+# View real-time logs
+tail -f output/logs/system.log
 
-# 检查conda环境
-conda info --envs  # 确认tiao环境存在
-
-# 检查关键包
-pip list | grep -E "(opencv|realsense|numpy)"
-```
-
-### 日志查看
-
-```bash
-# 详细日志输出
-python -m src.main --mode demo --verbose
-
-# 日志文件位置
-ls output/logs/
-```
-
-### 性能优化建议
-
-1. **使用USB 3.0** - 确保相机连接到USB 3.0端口
-2. **关闭不必要程序** - 释放CPU和内存资源
-3. **调整分辨率** - 系统自动适配最佳分辨率
-4. **GPU加速** - 使用NVIDIA GPU可提升处理速度
-
----
-
-## 📁 输出文件说明
-
-### 目录结构
-
-```
-output/
-├── images/          # 保存的图像文件 (使用--save参数)
-├── logs/            # 系统日志文件
-└── point_clouds/    # 点云数据文件 (如果生成)
-```
-
-### 保存的文件类型
-
-- **图像文件**: `tracking_YYYYMMDD_HHMMSS.jpg`
-- **日志文件**: `tiaozhanbei2_YYYYMMDD.log`
-- **配置文件**: `d455_intrinsics.npz` (相机标定结果)
-
----
-
-## 🎯 快速验证
-
-### 30秒快速测试
-
-```bash
-# 1. 激活环境
-conda activate tiao
-
-# 2. 连接相机 (RealSense D455)
-
-# 3. 运行测试
-python test_pipe_tracking.py
-
-# 4. 查看结果
-# 应显示：✅ 四象限管道检测测试完成!
-```
-
-### 完整功能测试
-
-```bash
-# 运行演示模式
-python -m src.main --mode demo --display
-
-# 应该看到：
-# - 系统状态正常
-# - 相机连接成功
-# - FPS显示正常 (20-30)
-# - 可视化窗口正常显示
+# View error logs
+grep "ERROR" output/logs/system.log
 ```
 
 ---
 
-## 🤝 技术支持
+## � Project Structure
 
-### 系统特性
-
-- ✅ **四象限管道检测** - 高精度管道识别和追踪
-- ✅ **实时可视化** - 多窗口实时图像显示
-- ✅ **自动适配** - 相机分辨率和配置自动适配
-- ✅ **错误恢复** - 完善的异常处理和资源管理
-- ✅ **性能监控** - 实时FPS和系统状态监控
-
-### 版本信息
-
-- **当前版本**: Tiaozhanbei2.0
-- **最后更新**: 2025年7月22日
-- **Python版本**: 3.8.20
-- **主要依赖**: OpenCV 4.5+, pyrealsense2, NumPy
-
-### 联系支持
-
-如遇问题请检查：
-1. 硬件连接是否正确
-2. 环境配置是否完整  
-3. 运行命令是否正确
-4. 查看详细日志输出 (`--verbose`)
+```
+A-visual-control-program/
+├── 📦 Core Source Code
+│   └── src/                    # Main source code directory
+│       ├── main.py            # System main program entry
+│       ├── config.py          # System configuration parameters
+│       ├── camera/            # Camera module
+│       │   ├── calibration.py      # Camera calibration
+│       │   ├── stereo_capture.py   # RealSense data capture
+│       │   ├── depth_estimation.py # Depth estimation
+│       │   └── point_cloud_*.py    # Point cloud processing
+│       ├── perception/        # Perception module
+│       │   ├── pipe_tracking.py    # Main pipe tracking algorithm
+│       │   ├── obstacle_detection.py # Obstacle detection
+│       │   ├── partial_pipe_tracker.py # Partial pipe tracking
+│       │   └── pipe_direction_predictor.py # Direction prediction
+│       ├── control/          # Control module
+│       │   └── turn_control.py    # Steering control management
+│       ├── robot/            # Robot communication
+│       │   └── communication.py   # Serial communication
+│       └── utils/            # Utility module
+│           ├── display.py         # Display management
+│           ├── keyboard_control.py # Keyboard control
+│           └── logger.py          # Logging system
+│
+├── 🌐 Web Control Interface
+│   └── web/                   # Web interface
+│       ├── web_simple.py      # Flask web server
+│       ├── templates/         # HTML templates
+│       │   └── index.html     # Main control interface
+│       ├── static/            # Static resources (reserved)
+│       └── README.md          # Web usage guide
+│
+├── 🧪 Testing & Scripts
+│   ├── tests/                 # Unit tests
+│   │   ├── test_camera.py     # Camera testing
+│   │   ├── test_perception.py # Perception module testing
+│   │   ├── test_robot.py      # Robot communication testing
+│   │   └── *.py               # Other test files
+│   └── scripts/               # Running scripts
+│       ├── run_demo.sh        # Demo script
+│       └── *.sh               # Other scripts
+│
+├── 📊 Data & Output
+│   ├── data/                  # Data directory
+│   │   └── calib/             # Camera calibration data
+│   └── output/                # Output directory
+│       ├── images/            # Saved processed images
+│       ├── logs/              # System logs
+│       ├── results/           # Detection results
+│       └── videos/            # Recorded videos
+│
+├── 📚 Documentation & Configuration
+│   ├── docs/                  # Detailed documentation
+│   ├── requirements_pip.txt   # Python dependencies (simplified)
+│   ├── requirements.txt       # Complete dependencies (conda export)
+│   ├── start_web.sh          # Web startup script
+│   ├── demo_web.sh           # Web demo script
+│   ├── README.md             # Project description (Chinese)
+│   └── README_EN.md          # Project description (this file)
+```
 
 ---
 
-**📝 README 更新日期**: 2025年7月22日  
-**🚀 项目状态**: 系统完全可用，所有主要功能已修复并测试通过
+## 💡 Usage Tips
+
+### First-time Usage Recommendations
+1. Run `python -m src.main --config-check` to check configuration first
+2. Use `--mode demo` to quickly verify system functionality
+3. Use web interface for more intuitive graphical operation
+4. Save detection images for analysis: `--save` parameter
+
+### Performance Optimization
+- Lower camera resolution can improve processing speed
+- Use `--verbose` parameter for performance analysis
+- Adjust detection thresholds in configuration file to optimize accuracy
+
+### Extension Development
+- Add new perception algorithms to `src/perception/` directory
+- Add control algorithms to `src/control/` directory
+- Extend web interface by modifying `web/templates/index.html`
+
+---
+
+## 📞 Technical Support
+
+### Issue Reporting
+If you encounter problems, please provide the following information:
+1. Operating system version
+2. Python version
+3. Error log content
+4. Command parameters used
+
+### Related Resources
+- [Intel RealSense SDK Documentation](https://dev.intelrealsense.com/)
+- [OpenCV Python Tutorial](https://docs.opencv.org/4.x/d6/d00/tutorial_py_root.html)
+- [Flask Web Development Documentation](https://flask.palletsprojects.com/)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See LICENSE file for details.
+
+---
+
+**Tiaozhanbei2.0 - Intelligent Pipe Tracking System**  
+*Empowering Robots with Visual Perception*
+robot.send_stop_command()
+
+# Receive status data
+status = robot.receive_status()
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+#### 🚫 Camera Connection Issues
+
+**Issue**: `pyrealsense2.error: No device connected`
+```bash
+# Solution steps:
+1. Check USB 3.0 connection
+2. Reinstall Intel RealSense SDK
+3. Update camera firmware
+4. Check USB port power capability
+
+# Verify connection
+realsense-viewer
+
+# List devices
+python -c "import pyrealsense2 as rs; print(rs.context().devices)"
+```
+
+#### 🔌 Serial Communication Issues
+
+**Issue**: `serial.SerialException: Could not open port`
+```bash
+# Windows solution:
+1. Check serial port number in Device Manager
+2. Confirm port is not occupied by other programs
+3. Run program with administrator privileges
+
+# Linux solution:
+sudo usermod -a -G dialout $USER  # Add user to serial group
+sudo chmod 666 /dev/ttyUSB0        # Modify permissions
+
+# List available ports
+python -c "import serial.tools.list_ports; print([p.device for p in serial.tools.list_ports.comports()])"
+```
+
+---
+
+## 👥 Development Guide
+
+### 🏗️ Project Structure
+```
+Tiaozhanbei2.0/
+├── src/                     # Source code directory
+│   ├── main.py             # Main program entry
+│   ├── config.py           # Configuration management
+│   ├── camera/             # Camera module
+│   ├── perception/         # Perception algorithms
+│   ├── robot/              # Robot communication
+│   └── utils/              # Utility functions
+├── tests/                  # Test files
+├── data/                   # Data directory
+├── output/                 # Output results
+├── scripts/               # Script files
+└── docs/                  # Documentation
+```
+
+### 🧪 Testing Guide
+
+#### Run Unit Tests
+```bash
+# Run all tests
+python -m pytest tests/
+
+# Run specific module tests
+python -m pytest tests/test_camera.py -v
+```
+
+---
+
+## 📚 References
+
+### 📖 Technical Documentation
+- [Intel RealSense SDK Documentation](https://intelrealsense.github.io/librealsense/python_docs/_generated/pyrealsense2.html)
+- [OpenCV Python Tutorials](https://opencv-python-tutroals.readthedocs.io/)
+- [DJI RoboMaster Development Guide](https://robomaster-dev.readthedocs.io/)
+
+---
+
+## 🤝 Contributing
+
+### 🔄 Contribution Process
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push branch: `git push origin feature/new-feature`
+5. Create Pull Request
+
+### 🐛 Issue Reporting
+Please report issues through GitHub Issues, including:
+- Detailed problem description
+- Reproduction steps
+- System environment information
+- Error logs
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details
+
+---
+
+## 👨‍💻 Author
+
+- **Author**: cxzandy
+- **Email**: [your-email@example.com]
+- **GitHub**: [cxzandy](https://github.com/cxzandy)
+
+---
+
+<div align="center">
+
+**⭐ If this project helps you, please give it a Star! ⭐**
+
+**🔗 [Project Home](https://github.com/cxzandy/A-vision-project-for-pipe-tracking-and-flange-recognition-available-for-DJI-c-board-communication) | 📧 [Contact Us](mailto:your-email@example.com) | 📖 [Documentation](docs/)**
+
+</div>

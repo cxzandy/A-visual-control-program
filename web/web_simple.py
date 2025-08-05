@@ -25,6 +25,7 @@ class SystemState:
         
         # 控制相关状态
         self.control_mode = 'auto'  # auto/manual
+        self.movement_mode = 'pipe'  # pipe/obstacle/flange
         self.turn_controller = None
         self.manual_command = None
         self.last_command_time = 0
@@ -73,8 +74,10 @@ def get_status():
     return jsonify({
         'is_running': system_state.is_running,
         'current_mode': system_state.current_mode,
+        'control_mode': system_state.control_mode,
+        'movement_mode': system_state.movement_mode,
         'stats': system_state.system_stats,
-        'turn_control': system_state.turn_stats,  # 添加转向控制状态
+        'turn_control': system_state.turn_stats,
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
 
@@ -88,7 +91,7 @@ def start_system_generic():
     
     try:
         data = request.get_json()
-        mode = data.get('mode', 'demo') if data else 'demo'
+        mode = data.get('mode', 'track') if data else 'track'  # 默认追踪模式
         
         # 调用具体的启动函数
         return start_system(mode)
@@ -107,9 +110,9 @@ def start_system(mode):
     try:
         # 构建命令
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if mode == 'demo':
-            cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "demo", "--display", "--save"]
-        elif mode == 'track':
+        
+        # 移除demo模式，只保留实用模式
+        if mode == 'track':
             cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "track", "--display", "--save"]
         elif mode == 'calib':
             cmd = ["conda", "run", "-n", "tiao", "python", "-m", "src.main", "--mode", "calib", "--display", "--save"]
@@ -385,33 +388,50 @@ def monitor_process():
 
 @app.route('/api/control_mode', methods=['POST'])
 def set_control_mode():
-    """设置控制模式（自动/手动）"""
+    """设置控制模式和运动方式"""
     try:
         data = request.get_json()
-        mode = data.get('mode', 'auto')
+        control_mode = data.get('control_mode', 'auto')
+        movement_mode = data.get('movement_mode', 'pipe')
         
-        if mode not in ['auto', 'manual']:
-            return jsonify({'status': 'error', 'message': '无效的控制模式'}), 400
+        if control_mode not in ['auto', 'manual']:
+            return jsonify({'success': False, 'message': '无效的控制模式'}), 400
+            
+        if movement_mode not in ['pipe', 'obstacle', 'flange']:
+            return jsonify({'success': False, 'message': '无效的运动方式'}), 400
         
         # 更新本地状态
         global system_state
-        system_state.control_mode = mode
+        system_state.control_mode = control_mode
+        system_state.movement_mode = movement_mode
         
         # 如果有主系统实例，也更新主系统
         if hasattr(app, 'main_system') and app.main_system:
-            app.main_system.set_control_mode(mode)
+            app.main_system.set_control_mode(control_mode)
+            app.main_system.set_movement_mode(movement_mode)
         
-        print(f"💡 控制模式切换为: {mode}")
+        mode_names = {
+            'auto': '自动模式',
+            'manual': '手动模式'
+        }
+        movement_names = {
+            'pipe': '管道追踪',
+            'obstacle': '避障导航', 
+            'flange': '法兰检测'
+        }
+        
+        print(f"💡 模式切换: {mode_names[control_mode]} + {movement_names[movement_mode]}")
         
         return jsonify({
-            'status': 'success',
-            'message': f'控制模式已切换为{mode}',
-            'mode': mode
+            'success': True,
+            'message': f'{mode_names[control_mode]} + {movement_names[movement_mode]}',
+            'control_mode': control_mode,
+            'movement_mode': movement_mode
         })
         
     except Exception as e:
         print(f"❌ 设置控制模式错误: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/manual_command', methods=['POST'])
 def manual_command():

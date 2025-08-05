@@ -1,53 +1,77 @@
-# Tiaozhanbei2.0 项目依赖
-# 管道追踪与法兰识别系统
+# Tiaozhanbei2.0 智能管道追踪系统 - PIP依赖列表
+# 基于实际项目使用情况的精简依赖列表
+# 适用于 pip install -r requirements_pip.txt
 
-# ============================ 核心依赖 ============================
-# 计算机视觉
-opencv-python>=4.8.0
-numpy>=1.21.0
+# =============================== 核心运行时依赖 ===============================
 
-# RealSense 相机支持
-pyrealsense2>=2.54.0
+# 计算机视觉 - OpenCV
+opencv-python>=4.8.0,<5.0.0
 
-# 串口通信
-pyserial>=3.5
+# 数值计算 - NumPy  
+numpy>=1.21.0,<2.0.0
 
-# ============================ 数据处理 ============================
-# 科学计算
-scipy>=1.9.0
+# Intel RealSense 深度相机
+pyrealsense2>=2.50.0
 
-# 点云处理 (可选，如果需要高级点云处理)
+# 串口通信 (机器人控制)
+pyserial>=3.5.0,<4.0.0
+
+# Web界面框架
+Flask>=3.0.0,<4.0.0
+
+# =============================== 安装说明 ===============================
+
+# 快速安装:
+#   pip install -r requirements_pip.txt
+
+# 分步安装 (推荐):
+#   pip install opencv-python numpy flask pyserial
+#   pip install pyrealsense2  # 需要先安装RealSense SDK
+
+# Conda环境安装:
+#   conda install opencv numpy flask
+#   pip install pyrealsense2 pyserial
+
+# =============================== 系统要求 ===============================
+
+# Python: 3.8+
+# 操作系统: Ubuntu 18.04+ / Windows 10+ / macOS 10.15+
+# 硬件: Intel RealSense D455 深度相机
+
+# =============================== 注意事项 ===============================
+
+# 1. pyrealsense2 依赖:
+#    - 需要先安装 Intel RealSense SDK 2.0
+#    - Ubuntu: sudo apt install librealsense2-dev
+#    - Windows: 下载官方SDK安装包
+#    - macOS: brew install librealsense
+
+# 2. OpenCV 注意:
+#    - 使用 opencv-python 而非 opencv-contrib-python
+#    - Jetson设备建议使用系统预装版本
+
+# 3. 串口权限 (Linux):
+#    - sudo usermod -a -G dialout $USER
+#    - 重新登录生效
+
+# =============================== 可选依赖 ===============================
+
+# 以下依赖可根据需要单独安装:
+
+# 点云处理 (高级功能):
 # open3d>=0.17.0
 
-# ============================ 系统工具 ============================
-# 参数解析和配置
-argparse  # 通常内置
+# 科学计算 (数学运算):  
+# scipy>=1.9.0
 
-# 日志和时间
-# logging  # 内置
-# datetime  # 内置
-
-# ============================ 开发工具 ============================
-# 测试框架
-pytest>=7.0.0
-pytest-cov>=4.0.0
-
-# 代码质量
-black>=23.0.0
-flake8>=6.0.0
-
-# ============================ 可选依赖 ============================
-# 如果需要图形界面
-# tkinter  # 通常内置
-
-# 如果需要高级数学运算
-# sympy>=1.11.0
-
-# 如果需要深度学习推理
+# 深度学习 (AI增强):
 # torch>=2.0.0
 # torchvision>=0.15.0
 
-# 如果需要机器学习
+# 开发工具:
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
 # scikit-learn>=1.3.0
 
 # ============================ 平台特定 ============================

@@ -1,0 +1,77 @@
+name: tiao
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python基础环境 (Jetson AGX Xavier 推荐Python 3.8)
+  - python=3.8
+  - pip
+  - setuptools
+  - wheel
+
+  # 数值计算库 (ARM64优化版本)
+  - numpy>=1.21.0
+  - scipy>=1.7.0
+  - pandas>=1.3.0
+
+  # 计算机视觉库 (使用conda-forge的ARM64预编译版本)
+  - opencv>=4.8.0
+  - pillow>=8.3.0
+
+  # 科学计算和机器学习
+  - scikit-learn>=1.0.0
+  - matplotlib>=3.4.0
+  - seaborn>=0.11.0
+
+  # Web框架
+  - flask>=2.0.0
+  - jinja2>=3.0.0
+
+  # 系统工具
+  - psutil
+  - tqdm
+  - pyyaml
+  - click
+
+  # 开发工具
+  - pytest
+  - black
+  - flake8
+
+  # Jetson平台系统库
+  - libgcc-ng
+  - libstdcxx-ng
+  - libgfortran-ng
+
+  # GPU加速库 (如果需要)
+  - cudatoolkit=11.4  # 匹配Jetson AGX Xavier的CUDA版本
+  - cudnn=8.2.0
+
+  # 通过pip安装的包
+  - pip:
+    # RealSense SDK (编译版本或预编译wheel)
+    - pyrealsense2>=2.50.0
+    
+    # 串口通信
+    - pyserial>=3.5.0
+    
+    # PyTorch for Jetson (需要从NVIDIA的wheel安装)
+    # 注意: 这里使用占位符，实际需要从NVIDIA官方下载适配Jetson的wheel
+    # 安装命令: pip install torch-1.x.x-cp38-cp38-linux_aarch64.whl
+    # 下载地址: https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048
+    
+    # Jetson专用GPIO库
+    - Jetson.GPIO
+    
+    # 其他工具
+    - loguru>=0.6.0
+    - rich>=12.0.0
+    - typer>=0.6.0
+    
+    # 图像处理增强
+    - imageio>=2.19.0
+    - scikit-image>=0.19.0
+    
+    # 网络和通信
+    - requests>=2.28.0
+    - websockets>=10.0

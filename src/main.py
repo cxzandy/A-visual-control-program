@@ -34,10 +34,8 @@ from config import (
 )
 
 # 导入各个模块
-from camera.calibration import calibrate_camera, check_realsense_connection
-from camera.stereo_capture import RealSenseCapture
-from camera.depth_estimation import DepthEstimator
-from camera.point_cloud_generator import PointCloudGenerator
+from camera.capture import RealSenseCapture, USBCapture, PointCloudGenerator, check_realsense_connection
+from camera.calibration import calibrate_camera
 from robot.communication import RoboMasterCSerial
 from perception.obstacle_detection import ObstacleDetector
 from perception.pipe_tracking import PipeTracker
@@ -99,7 +97,7 @@ class Tiaozhanbei2System:
         
     def initialize_hardware(self) -> bool:
         """初始化硬件组件"""
-        self.logger.info("正在初始化硬件组件...")
+        self.logger.info("初始化硬件组件...")
         
         # 1. 检查相机连接
         try:
@@ -146,26 +144,19 @@ class Tiaozhanbei2System:
             self.logger.info("机器人功能已禁用（配置设置）")
             self.robot = None
             
-        # 3. 初始化深度估计器
-        try:
-            self.depth_estimator = DepthEstimator(camera_instance=self.camera)
-            self.logger.info("深度估计器初始化成功")
-        except Exception as e:
-            self.logger.error(f"深度估计器初始化失败: {e}")
-            return False
-            
-        # 4. 初始化点云生成器
+        # 3. 初始化点云生成器
         try:
             self.point_cloud_generator = PointCloudGenerator()
             self.logger.info("点云生成器初始化成功")
         except Exception as e:
             self.logger.warning(f"点云生成器初始化失败: {e}")
+            self.point_cloud_generator = None
             
         return True
         
     def initialize_algorithms(self) -> bool:
         """初始化算法组件"""
-        self.logger.info("正在初始化算法组件...")
+        self.logger.info("初始化算法组件...")
         
         try:
             # 障碍物检测器
@@ -220,7 +211,7 @@ class Tiaozhanbei2System:
             
     def run_calibration_mode(self) -> bool:
         """运行相机标定模式"""
-        self.logger.info("开始相机标定模式...")
+        self.logger.info("开始相机标定...")
         
         try:
             camera_matrix, distortion_coeffs = calibrate_camera(
@@ -244,7 +235,7 @@ class Tiaozhanbei2System:
             
     def run_tracking_mode(self) -> bool:
         """运行实时追踪模式"""
-        self.logger.info("开始实时追踪模式...")
+        self.logger.info("开始实时追踪...")
         
         if not self.system_status["camera_connected"]:
             self.logger.error("相机未连接，无法运行追踪模式")
@@ -253,7 +244,7 @@ class Tiaozhanbei2System:
         # 启用键盘控制
         if ControlConfig.KEYBOARD_CONTROL_ENABLED:
             self.enable_keyboard_control()
-            self.logger.info("键盘控制已启用 - WASD控制, Q退出, M切换模式")
+            self.logger.info("键盘控制: WASD移动, Q退出, M切换模式")
             
         self.running = True
         frame_count = 0
@@ -298,7 +289,8 @@ class Tiaozhanbei2System:
                 if frame_count % 100 == 0:
                     elapsed_time = time.time() - start_time
                     avg_fps = frame_count / elapsed_time
-                    self.logger.info(f"处理帧数: {frame_count}, 平均FPS: {avg_fps:.2f}")
+                    print(f"运行: {avg_fps:.1f}fps {frame_count}帧")
+                    self.logger.info(f"帧数: {frame_count}, FPS: {avg_fps:.1f}")
                     
                 # 安全检查
                 if not self._safety_check():
@@ -314,7 +306,7 @@ class Tiaozhanbei2System:
             # 禁用键盘控制
             self.disable_keyboard_control()
             
-        self.logger.info(f"追踪模式结束，共处理 {frame_count} 帧")
+        self.logger.info(f"追踪结束，共 {frame_count} 帧")
         return True
         
     def _process_tracking_results(self, obstacle_mask, line_params, global_axis, vis_image, prediction_info=None, obstacle_analysis=None):
@@ -694,16 +686,11 @@ class Tiaozhanbei2System:
             
     def print_system_status(self):
         """打印系统状态"""
-        print("\n" + "="*50)
-        print("Tiaozhanbei2.0 系统状态")
-        print("="*50)
-        print(f"相机连接: {'✓' if self.system_status['camera_connected'] else '✗'}")
-        print(f"机器人连接: {'✓' if self.system_status['robot_connected'] else '✗'}")
-        print(f"标定加载: {'✓' if self.system_status['calibration_loaded'] else '✗'}")
-        print(f"处理帧数: {self.system_status['total_frames']}")
-        print(f"处理FPS: {self.system_status['processing_fps']:.2f}")
-        print(f"错误计数: {self.system_status['error_count']}")
-        print("="*50)
+        cam = '✓' if self.system_status['camera_connected'] else '✗'
+        robot = '✓' if self.system_status['robot_connected'] else '✗'
+        fps = self.system_status['processing_fps']
+        frames = self.system_status['total_frames']
+        print(f"状态: 相机{cam} 机器人{robot} FPS{fps:.1f} 帧{frames}")
         
     def cleanup(self):
         """清理资源"""
@@ -749,10 +736,10 @@ def create_argument_parser():
     
     parser.add_argument(
         "--mode", "-m",
-        choices=[RunModeConfig.DEMO_MODE, RunModeConfig.CALIBRATION_MODE, 
+        choices=[RunModeConfig.CALIBRATION_MODE, 
                 RunModeConfig.TRACKING_MODE, RunModeConfig.TEST_MODE],
         default=RunModeConfig.DEFAULT_MODE,
-        help="运行模式 (默认: demo)"
+        help="运行模式 (默认: track)"
     )
     
     parser.add_argument(
